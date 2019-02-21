@@ -266,5 +266,23 @@
  */
 + (void) updateDBVersion20To21;
 
+/**
+ * Changes:
+ *
+ * Support version 3.7.0
+ * Alter Keychain items to use credentialsDto as value instead password
+ * Alter users table, added new field to store that the server has fed shares, share link option name and share link option upload only API support.
+ */
++ (void) updateDBVersion21To22;
+
+
+/**
+ * Changes:
+ *
+ * Support version 3.7.4
+ * Alter files table, added new field to store the oc_privatelink from the propfind requests.
+ */
++ (void) updateDBVersion24To25;
+
 
 @end

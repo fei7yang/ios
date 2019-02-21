@@ -6,7 +6,7 @@
 //
 
 /*
- Copyright (C) 2016, ownCloud GmbH.
+ Copyright (C) 2018, ownCloud GmbH.
  This code is covered by the GNU Public License Version 3.
  For distribution utilizing Apple mechanisms please see https://owncloud.org/contribute/iOS-license-exception/
  You should have received a copy of this license
@@ -26,31 +26,27 @@
 
 + (void) updateServerFeaturesAndCapabilitiesOfActiveUser{
     
-    dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
-        AppDelegate *app = (AppDelegate *)[[UIApplication sharedApplication] delegate];
-        
+    AppDelegate *app = (AppDelegate *)[[UIApplication sharedApplication] delegate];
+    
         if (app.activeUser.username == nil) {
             app.activeUser = [ManageUsersDB getActiveUser];
         }
         
-        if (app.activeUser) {
+        UserDto *activeUser = [ManageUsersDB getActiveUser];
+        
+        if (activeUser) {
             
             [CheckCapabilities getServerCapabilitiesOfActiveAccount:^(OCCapabilities *capabilities) {
                 
                 if (capabilities) {
                     [CheckCapabilities updateServerCapabilitiesOfActiveAccountInDB:capabilities];
                     
-                    //if server version change update supported features
-                    if (![app.activeUser.capabilitiesDto.versionString isEqualToString:capabilities.versionString]) {
-                        [self updateServerFeaturesOfActiveUserForVersion:capabilities.versionString];
-                    }
+                    [self updateServerFeaturesOfActiveUserForVersion:capabilities.versionString];
                     
                     //update file list view if needed
                     BOOL capabilitiesShareAPIChanged = (app.activeUser.capabilitiesDto.isFilesSharingAPIEnabled == capabilities.isFilesSharingAPIEnabled)? NO:YES;
                     if(capabilitiesShareAPIChanged){
-                        dispatch_async(dispatch_get_main_queue(), ^{
-                            [CheckCapabilities reloadFileList];
-                        });
+                        [CheckCapabilities reloadFileList];
                     }
                     
                     app.activeUser.capabilitiesDto = [OCCapabilities new];
@@ -60,11 +56,9 @@
             } failure:^(NSError *error) {
                 DLog(@"error getting capabilities from server, we use previous capabilities from DB to update active user");
                 
-                app.activeUser.capabilitiesDto =  [ManageCapabilitiesDB getCapabilitiesOfUserId:app.activeUser.idUser];
+                app.activeUser.capabilitiesDto =  [ManageCapabilitiesDB getCapabilitiesOfUserId:app.activeUser.userId];
             }];
         }
-    });
-    
 }
 
 + (void) updateServerFeaturesOfActiveUserForVersion:(NSString *)versionString {

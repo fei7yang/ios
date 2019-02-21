@@ -18,7 +18,6 @@
 #import "AppDelegate.h"
 #import "UIColor+Constants.h"
 #import "constants.h"
-#import "EditAccountViewController.h"
 #import "UtilsDtos.h"
 #import "UIImage+Resize.h"
 #import "FileNameUtils.h"
@@ -160,7 +159,7 @@
     
     //TitleLabel
     if (_file) {
-        [_titleLabel setText:[_file.fileName stringByReplacingPercentEscapesUsingEncoding:(NSStringEncoding)NSUTF8StringEncoding]];
+        [_titleLabel setText:[_file.fileName stringByRemovingPercentEncoding]];
     } else if (_isFileCharged==NO && _file==nil){
         [_titleLabel setText:_linkTitle];
     } else {
@@ -187,7 +186,10 @@
         _titleLabelMarginRightConstraint.constant = 210;
         _updatingProgressMarginUpdatingRightConstraint.constant = 210;
         
-        if ((k_hide_share_options) || (APP_DELEGATE.activeUser.hasCapabilitiesSupport == serverFunctionalitySupported && APP_DELEGATE.activeUser.capabilitiesDto && !APP_DELEGATE.activeUser.capabilitiesDto.isFilesSharingAPIEnabled)) {
+        //Check if share link button should be appear.
+        
+        if ([ShareUtils hasShareOptionToBeHiddenForFile:self.file]) {
+            
             [items insertObject:_deleteButtonBar atIndex:indexPosition++];
             
             if ([FileNameUtils isEditTextViewSupportedThisFile:self.file.fileName]) {
@@ -270,8 +272,8 @@
     self.isForceDownload = isForceDownload;
     
     //Get the current local folder
-    _currentLocalFolder = [NSString stringWithFormat:@"%@%ld/%@", [UtilsUrls getOwnCloudFilePath],(long)app.activeUser.idUser, [UtilsUrls getFilePathOnDBByFilePathOnFileDto:myFile.filePath andUser:app.activeUser]];
-    _currentLocalFolder = [_currentLocalFolder stringByReplacingPercentEscapesUsingEncoding:NSUTF8StringEncoding];
+    _currentLocalFolder = [NSString stringWithFormat:@"%@%ld/%@", [UtilsUrls getOwnCloudFilePath],(long)app.activeUser.userId, [UtilsUrls getFilePathOnDBByFilePathOnFileDto:myFile.filePath andUser:app.activeUser]];
+    _currentLocalFolder = [_currentLocalFolder stringByRemovingPercentEncoding];
 
     //Quit the title
     _linkTitle=@"";
@@ -286,7 +288,7 @@
         //Stop the notification
         [self stopNotificationUpdatingFile];
         //Put the title in the toolBar
-        [_titleLabel setText:[_file.fileName stringByReplacingPercentEscapesUsingEncoding:(NSStringEncoding)NSUTF8StringEncoding]];
+        [_titleLabel setText:[_file.fileName stringByRemovingPercentEncoding]];
         _isViewBlocked = NO;
         
         //Remove the views
@@ -554,13 +556,9 @@
                 [self.officeView.webView removeFromSuperview];
             }
             self.officeView.delegate = self;
-            [self.officeView openOfficeFileWithPath:self.file.localFolder andFileName:self.file.fileName];
+            [self.officeView openOfficeFileWithPath:self.file.localFolder andFileName:self.file.fileName gesture:self.singleTap];
             
-            if (self.singleTap) {
-                [self.officeView.webView addGestureRecognizer:self.singleTap];
-            }
-            
-            [self.view addSubview:self.officeView.webView];
+            [self.view addSubview:self.officeView];
         }
         
     }
@@ -728,7 +726,7 @@
  */
 - (void)putTitleInNavBarByName:(NSString *) fileName{
     
-    [_titleLabel setText:[fileName stringByReplacingPercentEscapesUsingEncoding:(NSStringEncoding)NSUTF8StringEncoding]];
+    [_titleLabel setText:[fileName stringByRemovingPercentEncoding]];
 }
 
 
@@ -842,9 +840,10 @@
     self.view.backgroundColor = [UIColor colorOfBackgroundDetailViewiPad];
     
     _titleLabel.text = @"";
-    
-    [_openWith.documentInteractionController dismissMenuAnimated:YES];
-    
+    if (_openWith && _openWith.documentInteractionController) {
+        [_openWith.documentInteractionController dismissMenuAnimated:YES];
+    }
+        
     [self removeThePreviousViews];
     
     _isFileCharged = NO;
@@ -1052,7 +1051,7 @@
  */
 - (IBAction)didPressShareLinkButton:(id)sender {
     DLog(@"Share button clicked");
-    
+
     if (_openWith && _openWith.documentInteractionController) {
         [_openWith.documentInteractionController dismissMenuAnimated:YES];
     }
@@ -1543,56 +1542,59 @@
 - (void)downloadCompleted:(FileDto *)fileDto {
     DLog(@"Hey, file is in device, go to preview");
     
-    if (_typeOfFile == imageFileType) {
-        _isUpdatingFile = NO;
-    }
-   
-    //Update fileDto
-    AppDelegate *app = (AppDelegate *)[[UIApplication sharedApplication]delegate];
-    _file = [ManageFilesDB getFileDtoByFileName:_file.fileName andFilePath:[UtilsUrls getFilePathOnDBByFilePathOnFileDto:_file.filePath andUser:app.activeUser] andUser:app.activeUser];
-    
-    //Only if the file is the same
-     if ([fileDto.localFolder isEqualToString: _file.localFolder]) {
-        
-        _isDownloading = NO;
-        
-        _cancelButton.hidden = YES;
-        _isFileCharged = YES;
+    dispatch_async(dispatch_get_main_queue(), ^{
+        if (_typeOfFile == imageFileType) {
+            _isUpdatingFile = NO;
+        }
         
         //Update fileDto
-        _file=[ManageFilesDB getFileDtoByIdFile:_file.idFile];
+        AppDelegate *app = (AppDelegate *)[[UIApplication sharedApplication]delegate];
+        _file = [ManageFilesDB getFileDtoByFileName:_file.fileName andFilePath:[UtilsUrls getFilePathOnDBByFilePathOnFileDto:_file.filePath andUser:app.activeUser] andUser:app.activeUser];
         
-
-        //Quit the player if exist
-        if (self.avMoviePlayer) {
-            [self removeMediaPlayer];
-        }
-        
-        //Depend if the file is an image or other "openimage" or "openfile"
-        
-        if (_file != nil) {
-            if (_typeOfFile == officeFileType) {
-                [self performSelector:@selector(openFileOffice) withObject:nil afterDelay:0.0];
-            } else if (_typeOfFile == gifFileType) {
-                [self performSelector:@selector(openGifFile) withObject:nil afterDelay:0.0];
-            } else if(_typeOfFile == audioFileType) {
-                [self performSelector:@selector(playMediaFile) withObject:nil afterDelay:0.0];
-            } else if(_typeOfFile == videoFileType) {
-                [self performSelector:@selector(playMediaFile) withObject:nil afterDelay:0.0];
-            }  else if (_typeOfFile == imageFileType){
-                DLog(@"Image file");
-            } else {
-                [self performSelector:@selector(openFile) withObject:nil afterDelay:0.0];
+        //Only if the file is the same
+        if ([fileDto.localFolder isEqualToString: _file.localFolder]) {
+            
+            _isDownloading = NO;
+            
+            _cancelButton.hidden = YES;
+            _isFileCharged = YES;
+            
+            //Update fileDto
+            _file=[ManageFilesDB getFileDtoByIdFile:_file.idFile];
+            
+            
+            //Quit the player if exist
+            if (self.avMoviePlayer) {
+                [self removeMediaPlayer];
             }
+            
+            //Depend if the file is an image or other "openimage" or "openfile"
+            
+            if (_file != nil) {
+                if (_typeOfFile == officeFileType) {
+                    [self performSelector:@selector(openFileOffice) withObject:nil afterDelay:0.0];
+                } else if (_typeOfFile == gifFileType) {
+                    [self performSelector:@selector(openGifFile) withObject:nil afterDelay:0.0];
+                } else if(_typeOfFile == audioFileType) {
+                    [self performSelector:@selector(playMediaFile) withObject:nil afterDelay:0.0];
+                } else if(_typeOfFile == videoFileType) {
+                    [self performSelector:@selector(playMediaFile) withObject:nil afterDelay:0.0];
+                }  else if (_typeOfFile == imageFileType){
+                    DLog(@"Image file");
+                } else {
+                    [self performSelector:@selector(openFile) withObject:nil afterDelay:0.0];
+                }
+            }
+            
+            [self performSelector:@selector(hiddenButtonsAfterDownload) withObject:nil afterDelay:0.0];
         }
+        //Stop the notification
+        [self stopNotificationUpdatingFile];
+        //Enable view
+        _isViewBlocked = NO;
+        [self unBlockFileList];
         
-        [self performSelector:@selector(hiddenButtonsAfterDownload) withObject:nil afterDelay:0.0];
-    }
-    //Stop the notification
-    [self stopNotificationUpdatingFile];
-    //Enable view
-    _isViewBlocked = NO;
-    [self unBlockFileList];
+    });
 }
 
 /*
@@ -1628,18 +1630,17 @@
 }
 
 - (void) showErrorMessageIfNotIsShowingWithString:(NSString *)string{
+    dispatch_async(dispatch_get_main_queue(), ^{
+        AppDelegate *app = (AppDelegate *)[[UIApplication sharedApplication]delegate];
     
-    AppDelegate *app = (AppDelegate *)[[UIApplication sharedApplication]delegate];
-    
-    if (!app.downloadErrorAlertView) {
-        dispatch_async(dispatch_get_main_queue(), ^{
+        if (!app.downloadErrorAlertView) {
+        
             app.downloadErrorAlertView = [[UIAlertView alloc] initWithTitle:string message:@"" delegate:self cancelButtonTitle:NSLocalizedString(@"ok", nil) otherButtonTitles:nil, nil];
             app.downloadErrorAlertView.tag = k_alertview_for_download_error;
         
             [app.downloadErrorAlertView show];
-        });
-    }
-    
+        }
+    });
 }
 
 - (void)showNotConnectionWithServerMessage{
@@ -1706,27 +1707,14 @@
 
 
 - (void)willRotateToInterfaceOrientation:(UIInterfaceOrientation)toInterfaceOrientation duration:(NSTimeInterval)duration{
-    
-    if (IS_IOS7) {
-        [self customWillRotateToInterfaceOrientation:toInterfaceOrientation duration:duration];
-    }
-    
 }
 
 -(void) willAnimateRotationToInterfaceOrientation:(UIInterfaceOrientation)toInterfaceOrientation duration:(NSTimeInterval)duration {
-    
-    if (IS_IOS7) {
-       [self customWillAnimateRotationToInterfaceOrientation:toInterfaceOrientation duration:duration];
-    }
  
 }
 
 - (void)didRotateFromInterfaceOrientation:(UIInterfaceOrientation)fromInterfaceOrientation{
     
-    if (IS_IOS7) {
-        [self customDidRotateFromInterfaceOrientation:fromInterfaceOrientation];
-    }
-
 }
 
 #pragma mark - Interface Rotations
@@ -1743,7 +1731,7 @@
         [self.readerPDFViewController willRotateToInterfaceOrientation:toInterfaceOrientation duration:duration];
     }
     
-    if (_openWith) {
+     if (_openWith && _openWith.documentInteractionController) {
         [_openWith.documentInteractionController dismissMenuAnimated:NO];
     }
     
@@ -1766,7 +1754,10 @@
     if (self.galleryView) {
         [self adjustGalleryScrollView];
     }
-    
+
+	if (self.officeView) {
+		self.officeView.frame = [self getTheCorrectSize];
+	}
 }
 
 - (void)customDidRotateFromInterfaceOrientation:(UIInterfaceOrientation)fromInterfaceOrientation{
@@ -1831,20 +1822,13 @@
     
     AppDelegate *appDelegate = (AppDelegate*)[[UIApplication sharedApplication] delegate];
     [appDelegate.downloadManager errorLogin];
-    
-    if(k_is_oauth_active) {
-        NSURL *url = [NSURL URLWithString:k_oauth_login];
-        [[UIApplication sharedApplication] openURL:url];
-        
-    } else {
 
-        EditAccountViewController *viewController = [[EditAccountViewController alloc]initWithNibName:@"EditAccountViewController_iPhone" bundle:nil andUser:appDelegate.activeUser andLoginMode:LoginModeExpire];
-        [viewController setBarForCancelForLoadingFromModal];
+    
+    UniversalLoginViewController *viewController = [UtilsLogin getLoginVCWithMode:LoginModeExpire andUser:APP_DELEGATE.activeUser];
         
-        OCNavigationController *navController = [[OCNavigationController alloc] initWithRootViewController:viewController];
-        navController.modalPresentationStyle = UIModalPresentationFormSheet;
-        [appDelegate.splitViewController presentViewController:navController animated:YES completion:nil];
-    }
+    OCNavigationController *navController = [[OCNavigationController alloc] initWithRootViewController:viewController];
+    navController.modalPresentationStyle = UIModalPresentationFormSheet;
+    [appDelegate.splitViewController presentViewController:navController animated:YES completion:nil];
 }
 
 #pragma mark - Notifications methods
@@ -1957,7 +1941,7 @@
         }
         
         //File name
-        NSString *notificationText = [NSString stringWithFormat:@"%@ %@", NSLocalizedString(@"updating", nil), [nameFileToUpdate stringByReplacingPercentEscapesUsingEncoding:NSUTF8StringEncoding]];
+        NSString *notificationText = [NSString stringWithFormat:@"%@ %@", NSLocalizedString(@"updating", nil), [nameFileToUpdate stringByRemovingPercentEncoding]];
         DLog(@"name: %@",notificationText);
         [_notification displayNotificationWithMessage:notificationText completion:nil];
     }
@@ -2047,31 +2031,14 @@
         
         CGFloat deltaWidth = k_delta_width_for_split_transition;
         
-
-        if (IS_IOS8 || IS_IOS9) {
-            
-            selfFrame.size.width += deltaWidth;
-            selfFrame.origin.x -= deltaWidth;
-            
-        }else{
-            
-            if (IS_PORTRAIT) {
-                selfFrame.size.width += deltaWidth;
-                selfFrame.origin.x -= deltaWidth;
-            }else{
-                selfFrame.size.height += deltaWidth;
-                selfFrame.origin.y -= deltaWidth;
-            }
-            
-        }
+        selfFrame.size.width += deltaWidth;
+        selfFrame.origin.x -= deltaWidth;
         
         [self.splitViewController.view setFrame:selfFrame];
         
         self.hideMaster = !self.hideMaster;
         
-        if (IS_IOS9) {
-            [self.splitViewController viewWillTransitionToSize:self.splitViewController.view.frame.size withTransitionCoordinator:self.splitViewController.transitionCoordinator];
-        }
+        [self.splitViewController viewWillTransitionToSize:self.splitViewController.view.frame.size withTransitionCoordinator:self.splitViewController.transitionCoordinator];
         
         [self.splitViewController willRotateToInterfaceOrientation:[UIApplication sharedApplication].statusBarOrientation duration:0];
         
@@ -2106,22 +2073,8 @@
             
             CGFloat deltaWidth = k_delta_width_for_split_transition;
             
-            if (IS_IOS8 || IS_IOS9) {
-                
-                selfFrame.size.width -= deltaWidth;
-                selfFrame.origin.x += deltaWidth;
-                
-            }else{
-                
-                if (IS_PORTRAIT) {
-                    selfFrame.size.width -= deltaWidth;
-                    selfFrame.origin.x += deltaWidth;
-                }else{
-                    selfFrame.size.height -= deltaWidth;
-                    selfFrame.origin.y += deltaWidth;
-                }
-                
-            }
+            selfFrame.size.width -= deltaWidth;
+            selfFrame.origin.x += deltaWidth;
             
             [self.splitViewController.view setFrame:selfFrame];
             [self.splitViewController willRotateToInterfaceOrientation:[UIApplication sharedApplication].statusBarOrientation duration:0];
@@ -2164,6 +2117,10 @@
     if (self.gifView) {
         self.gifView.alpha = 0.0;
     }
+
+	if (self.officeView) {
+		self.officeView.alpha = 0.0;
+	}
     
 }
 
@@ -2174,16 +2131,7 @@
     
     if (self.hideMaster) {
         
-        if (IS_IOS8 || IS_IOS9) {
-            frame = self.view.window.bounds;
-        }else{
-            
-            if (IS_PORTRAIT) {
-                frame = self.view.window.bounds;
-            }else{
-                frame = CGRectMake(0.0, 0.0, self.view.window.bounds.size.height, self.view.window.bounds.size.width);
-            }
-        }
+        frame = self.view.window.bounds;
         
     }else{
         
@@ -2216,6 +2164,11 @@
         self.readerPDFViewController.view.alpha = 1.0;
         self.mainScrollView.hidden = YES;
     }
+
+	if (self.officeView) {
+		self.officeView.frame = frame;
+		self.officeView.alpha = 1.0;
+	}
 }
 
 
@@ -2228,7 +2181,7 @@
                      animations:^(void)
      {
        
-         if (!self.hideMaster && IS_IOS9) {
+         if (!self.hideMaster) {
              [self.splitViewController.view setNeedsLayout];
              self.splitViewController.delegate = nil;
              self.splitViewController.delegate = self;
@@ -2238,58 +2191,23 @@
          
          CGFloat deltaWidth = k_delta_width_for_split_transition;
          
-         if (IS_IOS8 || IS_IOS9) {
-             
-             if (self.hideMaster)
-             {
-                 selfFrame.size.width += deltaWidth;
-                 selfFrame.origin.x -= deltaWidth;
-                 
-             }
-             else
-             {
-                 selfFrame.size.width -= deltaWidth;
-                 selfFrame.origin.x += deltaWidth;
-
-             }
-
-         }else{
-             
-             if (self.hideMaster)
-             {
-                 if (IS_PORTRAIT) {
-                     selfFrame.size.width += deltaWidth;
-                     selfFrame.origin.x -= deltaWidth;
-                 }else{
-                     selfFrame.size.height += deltaWidth;
-                     selfFrame.origin.y -= deltaWidth;
-                 }
- 
-             }
-             else
-             {
-                 if (IS_PORTRAIT) {
-                     selfFrame.size.width -= deltaWidth;
-                     selfFrame.origin.x += deltaWidth;
-                 }else{
-                     selfFrame.size.height -= deltaWidth;
-                     selfFrame.origin.y += deltaWidth;
-                 }
-             }
-
+         if (self.hideMaster) {
+             selfFrame.size.width += deltaWidth;
+             selfFrame.origin.x -= deltaWidth;
+         } else {
+             selfFrame.size.width -= deltaWidth;
+             selfFrame.origin.x += deltaWidth;
          }
-
+         
          [self.splitViewController.view setFrame:selfFrame];
          
-         if (!self.hideMaster && IS_IOS9) {
+         if (!self.hideMaster) {
               [self.splitViewController.view layoutIfNeeded];
          }
-         
          
      }completion:^(BOOL finished){
          if (finished)
          {
-             
              if (completionBlock)
              {
                  completionBlock();

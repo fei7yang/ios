@@ -19,7 +19,6 @@
 #import "UIColor+Constants.h"
 #import "constants.h"
 #import "AppDelegate.h"
-#import "EditAccountViewController.h"
 #import "UtilsDtos.h"
 #import "UIImage+Resize.h"
 #import "UserDto.h"
@@ -46,12 +45,16 @@
 #import "UtilsBrandedOptions.h"
 #import "UtilsFramework.h"
 #import "CheckAccessToServer.h"
+#import "UtilsNotifications.h"
 
 //Constant for iOS7
 #define k_status_bar_height 20
 #define k_navigation_bar_height 44
 #define k_navigation_bar_height_in_iphone_landscape 32
 #define k_iphone_plus_correction 10
+
+#define k_iphone_x_bottom_correction_portrait 34
+#define k_iphone_x_bottom_correction_landscape 21
 
 
 NSString * iPhoneCleanPreviewNotification = @"iPhoneCleanPreviewNotification";
@@ -83,7 +86,6 @@ NSString * iPhoneShowNotConnectionWithServerMessageNotification = @"iPhoneShowNo
     self.isForceDownload = isForceDownload;
     
     DLog(@"File to preview: %@ with File id: %ld", self.file.fileName, (long)file.idFile);
-    
     
     self = [super initWithNibName:nibNameOrNil bundle:nil];
     return self;
@@ -129,8 +131,8 @@ NSString * iPhoneShowNotConnectionWithServerMessageNotification = @"iPhoneShowNo
     
     //Get current local folder
     AppDelegate *app = (AppDelegate *)[[UIApplication sharedApplication]delegate];
-    _currentLocalFolder = [NSString stringWithFormat:@"%@%ld/%@", [UtilsUrls getOwnCloudFilePath],(long)app.activeUser.idUser, [UtilsUrls getFilePathOnDBByFilePathOnFileDto:_file.filePath andUser:app.activeUser]];
-    _currentLocalFolder = [_currentLocalFolder stringByReplacingPercentEscapesUsingEncoding:NSUTF8StringEncoding];
+    _currentLocalFolder = [NSString stringWithFormat:@"%@%ld/%@", [UtilsUrls getOwnCloudFilePath],(long)app.activeUser.userId, [UtilsUrls getFilePathOnDBByFilePathOnFileDto:_file.filePath andUser:app.activeUser]];
+    _currentLocalFolder = [_currentLocalFolder stringByRemovingPercentEncoding];
     
     //Obtain the type of file
     _typeOfFile = [FileNameUtils checkTheTypeOfFile:_file.fileName];
@@ -146,7 +148,8 @@ NSString * iPhoneShowNotConnectionWithServerMessageNotification = @"iPhoneShowNo
     }
     
     //Check if share link button should be appear.
-    if ((k_hide_share_options) || (APP_DELEGATE.activeUser.hasCapabilitiesSupport == serverFunctionalitySupported && APP_DELEGATE.activeUser.capabilitiesDto && !APP_DELEGATE.activeUser.capabilitiesDto.isFilesSharingAPIEnabled)) {
+    if ([ShareUtils hasShareOptionToBeHiddenForFile:self.file]) {
+        
         NSMutableArray *customItems = [NSMutableArray arrayWithArray:self.toolBar.items];
         [customItems removeObjectIdenticalTo:_shareButtonBar];
         [customItems removeObjectIdenticalTo:_flexibleSpaceAfterShareButtonBar];
@@ -231,7 +234,6 @@ NSString * iPhoneShowNotConnectionWithServerMessageNotification = @"iPhoneShowNo
         navController.navigationBar.translucent = NO;
         
         if (IS_IPHONE) {
-            viewController.hidesBottomBarWhenPushed = YES;
             [self presentViewController:navController animated:YES completion:nil];
         } else {
             navController.modalPresentationStyle = UIModalPresentationFormSheet;
@@ -359,7 +361,7 @@ NSString * iPhoneShowNotConnectionWithServerMessageNotification = @"iPhoneShowNo
         }
         
         //File name
-        NSString *notificationText = [NSString stringWithFormat:@"%@ %@", NSLocalizedString(@"updating", nil), [nameFileToUpdate stringByReplacingPercentEscapesUsingEncoding:NSUTF8StringEncoding]];
+        NSString *notificationText = [NSString stringWithFormat:@"%@ %@", NSLocalizedString(@"updating", nil), [nameFileToUpdate stringByRemovingPercentEncoding]];
         DLog(@"name: %@",notificationText);
         [_notification displayNotificationWithMessage:notificationText completion:nil];
     }
@@ -429,6 +431,31 @@ NSString * iPhoneShowNotConnectionWithServerMessageNotification = @"iPhoneShowNo
         } else {
             self.avMoviePlayer.view.frame = CGRectMake(0,0, screenSize.width, (screenSize.height - _toolBar.frame.size.height - k_status_bar_height - k_navigation_bar_height));
         }
+    } else if (self.gifView) {
+        if (IS_IPHONE_X) {
+            CGRect frame = self.view.frame;
+            frame.size.height = frame.size.height-(_toolBar.frame.size.height + k_iphone_x_bottom_correction_portrait + self.navigationController.navigationBar.frame.size.height + [[UIApplication sharedApplication] statusBarFrame].size.height);
+            frame.origin.y = self.navigationController.navigationBar.frame.size.height + [[UIApplication sharedApplication] statusBarFrame].size.height;
+            self.gifView.frame = frame;
+        }
+    } else if (self.officeView) {
+        
+        if (self.officeView.isFullScreen) {
+            self.officeView.isFullScreen = NO;
+            [self setFullscreenOfficeFileView:self.officeView.isFullScreen];
+        }
+        
+        if (IS_IPHONE_X) {
+            CGRect frame = self.view.frame;
+            frame.size.height = frame.size.height-(_toolBar.frame.size.height + k_iphone_x_bottom_correction_portrait);
+            frame.origin.y = 0;
+            self.officeView.frame = frame;
+        } else {
+            CGRect frame = self.view.frame;
+            frame.size.height = frame.size.height-(_toolBar.frame.size.height);
+            frame.origin.y = 0;
+            self.officeView.frame = frame;
+        }
     }
 }
 
@@ -453,6 +480,31 @@ NSString * iPhoneShowNotConnectionWithServerMessageNotification = @"iPhoneShowNo
             self.avMoviePlayer.view.frame = CGRectMake(0,0, screenSize.height, (screenSize.width - _toolBar.frame.size.height - k_status_bar_height - k_navigation_bar_height_in_iphone_landscape - iPhoneCorrection));
         }
         
+    } else if (self.gifView) {
+        if (IS_IPHONE_X) {
+            CGRect frame = self.view.frame;
+            frame.size.height = frame.size.height-(_toolBar.frame.size.height + k_iphone_x_bottom_correction_landscape + self.navigationController.navigationBar.frame.size.height + [[UIApplication sharedApplication] statusBarFrame].size.height);
+            frame.origin.y = self.navigationController.navigationBar.frame.size.height + [[UIApplication sharedApplication] statusBarFrame].size.height;
+            self.gifView.frame = frame;
+        }
+    } else if (self.officeView) {
+        
+        if (self.officeView.isFullScreen) {
+            self.officeView.isFullScreen = NO;
+            [self setFullscreenOfficeFileView:self.officeView.isFullScreen];
+        }
+        
+        if (IS_IPHONE_X) {
+            CGRect frame = self.view.frame;
+            frame.size.height = frame.size.height-(_toolBar.frame.size.height + k_iphone_x_bottom_correction_landscape + [[UIApplication sharedApplication] statusBarFrame].size.height);
+            frame.origin.y = 0;
+            self.officeView.frame = frame;
+        } else {
+            CGRect frame = self.view.frame;
+            frame.size.height = frame.size.height-(_toolBar.frame.size.height);
+            frame.origin.y = 0;
+            self.officeView.frame = frame;
+        }
     }
 }
 
@@ -474,8 +526,19 @@ NSString * iPhoneShowNotConnectionWithServerMessageNotification = @"iPhoneShowNo
         [_galleryView prepareScrollViewBeforeTheRotation];
     } else if (_readerPDFViewController) {
         [_readerPDFViewController willRotateToInterfaceOrientation:toInterfaceOrientation duration:duration];
+        
+        CGRect frame = self.view.frame;
+        if (IS_IPHONE_X) {
+            if (IS_PORTRAIT) {
+                frame.size.height = frame.size.height - (_toolBar.frame.size.height + k_iphone_x_bottom_correction_landscape);
+                frame.origin.y = 0;
+            } else {
+                frame.size.height = frame.size.height - (_toolBar.frame.size.height + k_iphone_x_bottom_correction_portrait);
+                frame.origin.y = 0;
+            }
+            [_readerPDFViewController.view setFrame:frame];
+        }
     }
- 
 }
 
 -(void) willAnimateRotationToInterfaceOrientation:(UIInterfaceOrientation)toInterfaceOrientation duration:(NSTimeInterval)duration {
@@ -502,7 +565,7 @@ NSString * iPhoneShowNotConnectionWithServerMessageNotification = @"iPhoneShowNo
     } else if (_officeView) {
         CGRect frame = self.view.frame;
         _officeView.frame = frame;
-        _toolBar.hidden = _officeView.isFullscreen;
+        _toolBar.hidden = _officeView.isFullScreen;
     } else {
         _toolBar.hidden = NO;
     }
@@ -691,6 +754,18 @@ NSString * iPhoneShowNotConnectionWithServerMessageNotification = @"iPhoneShowNo
     //Enable back button
     self.navigationController.navigationBar.userInteractionEnabled = YES;
     _toolBar.userInteractionEnabled = YES;
+
+}
+
+- (void) dismissOpenWith {
+    
+    if (self.openWith) {
+        [self.openWith.documentInteractionController dismissMenuAnimated:false];
+        [self.openWith.documentInteractionController dismissPreviewAnimated:false];
+    }
+    
+    
+    
     
 }
 
@@ -710,7 +785,16 @@ NSString * iPhoneShowNotConnectionWithServerMessageNotification = @"iPhoneShowNo
                 _readerPDFViewController = [[ReaderViewController alloc] initWithReaderDocument:_documentPDF];
                 
                 CGRect frame = self.view.frame;
-                frame.size.height = frame.size.height-_toolBar.frame.size.height;
+                if (IS_IPHONE_X) {
+                    if (IS_PORTRAIT) {
+                        frame.size.height = frame.size.height-(_toolBar.frame.size.height + k_iphone_x_bottom_correction_portrait);
+                    } else {
+                        frame.size.height = frame.size.height-(_toolBar.frame.size.height + k_iphone_x_bottom_correction_landscape);
+                    }
+                } else {
+                    frame.size.height = frame.size.height-(_toolBar.frame.size.height);
+                }
+                
                 frame.origin.y = 0;
                 
                 [_readerPDFViewController.view setFrame:frame];
@@ -726,13 +810,22 @@ NSString * iPhoneShowNotConnectionWithServerMessageNotification = @"iPhoneShowNo
                 
                 if (!_officeView) {
                     CGRect frame = self.view.frame;
-                    frame.size.height = frame.size.height-_toolBar.frame.size.height;
+                    if (IS_IPHONE_X) {
+                        if (IS_PORTRAIT) {
+                            frame.size.height = frame.size.height-(_toolBar.frame.size.height + k_iphone_x_bottom_correction_portrait);
+                        } else {
+                            frame.size.height = frame.size.height-(_toolBar.frame.size.height + k_iphone_x_bottom_correction_landscape);
+                        }
+                    } else {
+                        frame.size.height = frame.size.height-_toolBar.frame.size.height;
+                    }
+                    
                     frame.origin.y = 0;
                     _officeView=[[OfficeFileView alloc]initWithFrame:frame];
                     _officeView.delegate = self;
                 }
                 
-                [_officeView openOfficeFileWithPath:_file.localFolder andFileName:_file.fileName];
+                [_officeView openOfficeFileWithPath:_file.localFolder andFileName:_file.fileName gesture:nil];
                 
                 [self.view addSubview:_officeView];
                 if (_file.isNecessaryUpdate) {
@@ -763,7 +856,17 @@ NSString * iPhoneShowNotConnectionWithServerMessageNotification = @"iPhoneShowNo
     self.gifView.clipsToBounds = true;
     
     CGRect frame = self.view.frame;
-    frame.size.height = frame.size.height-(_toolBar.frame.size.height + self.navigationController.navigationBar.frame.size.height + [[UIApplication sharedApplication] statusBarFrame].size.height);
+    
+    if (IS_IPHONE_X) {
+        if (IS_PORTRAIT) {
+            frame.size.height = frame.size.height-((_toolBar.frame.size.height + k_iphone_x_bottom_correction_portrait) + self.navigationController.navigationBar.frame.size.height + [[UIApplication sharedApplication] statusBarFrame].size.height);
+        } else {
+            frame.size.height = frame.size.height-((_toolBar.frame.size.height + k_iphone_x_bottom_correction_landscape) + self.navigationController.navigationBar.frame.size.height + [[UIApplication sharedApplication] statusBarFrame].size.height);
+        }
+    } else {
+        frame.size.height = frame.size.height-(_toolBar.frame.size.height + self.navigationController.navigationBar.frame.size.height + [[UIApplication sharedApplication] statusBarFrame].size.height);
+    }
+    
     frame.origin.y = self.navigationController.navigationBar.frame.size.height + [[UIApplication sharedApplication] statusBarFrame].size.height;
     self.gifView.frame = frame;
     [self.view addSubview:self.gifView];
@@ -932,7 +1035,16 @@ NSString * iPhoneShowNotConnectionWithServerMessageNotification = @"iPhoneShowNo
         OCNavigationController *nc = (OCNavigationController*)self.navigationController;
         [nc manageBackgroundView:NO];
         //Set the new position of the toolBar
-        _toolBar.frame = CGRectMake(0, self.view.frame.size.height-_toolBar.frame.size.height, self.view.frame.size.width, _toolBar.frame.size.height);
+        if (IS_IPHONE_X) {
+            if (IS_PORTRAIT) {
+                _toolBar.frame = CGRectMake(0, self.view.frame.size.height-(_toolBar.frame.size.height + k_iphone_x_bottom_correction_portrait), self.view.frame.size.width, _toolBar.frame.size.height);
+            } else {
+                _toolBar.frame = CGRectMake(0, self.view.frame.size.height-(_toolBar.frame.size.height + k_iphone_x_bottom_correction_landscape), self.view.frame.size.width, _toolBar.frame.size.height);
+            }
+        } else {
+            _toolBar.frame = CGRectMake(0, self.view.frame.size.height-_toolBar.frame.size.height, self.view.frame.size.width, _toolBar.frame.size.height);
+        }
+        
         [self.view bringSubviewToFront:_toolBar];
     } completion:^(BOOL finished){
         //When the animation finish, show the labels in the tollBar
@@ -1694,21 +1806,14 @@ NSString * iPhoneShowNotConnectionWithServerMessageNotification = @"iPhoneShowNo
     AppDelegate *appDelegate = (AppDelegate*)[[UIApplication sharedApplication] delegate];
     [appDelegate.downloadManager errorLogin];
     
-    if(k_is_oauth_active) {
-        NSURL *url = [NSURL URLWithString:k_oauth_login];
-        [[UIApplication sharedApplication] openURL:url];
-    } else {
-        //Edit Account
-        AppDelegate *app = (AppDelegate *)[[UIApplication sharedApplication]delegate];
+    //Edit Account
         
-        EditAccountViewController *viewController = [[EditAccountViewController alloc]initWithNibName:@"EditAccountViewController_iPhone" bundle:nil andUser:app.activeUser andLoginMode:LoginModeExpire];
+    UniversalLoginViewController *loginVC = [UtilsLogin getLoginVCWithMode:LoginModeExpire andUser: appDelegate.activeUser];
         
-        viewController.hidesBottomBarWhenPushed = YES;
         
-        OCNavigationController *navController = [[OCNavigationController alloc] initWithRootViewController:viewController];
-        [self.navigationController presentViewController:navController animated:YES completion:nil];
+    OCNavigationController *navController = [[OCNavigationController alloc] initWithRootViewController:loginVC];
+    [self.navigationController presentViewController:navController animated:YES completion:nil];
 
-    }
     [self didPressCancelButton:nil];
 }
 
@@ -1725,6 +1830,7 @@ NSString * iPhoneShowNotConnectionWithServerMessageNotification = @"iPhoneShowNo
     [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(cleanView) name:iPhoneCleanPreviewNotification object:nil];
     [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(showNotConnectionWithServerMessage) name:iPhoneShowNotConnectionWithServerMessageNotification object:nil];
     [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(dismissThisView) name:IPhoneDoneEditFileTextMessageNotification object:nil];
+    [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(dismissOpenWith) name:DismissOpenWithFromPreviewNotification object:nil];
 }
 
 

@@ -48,19 +48,19 @@
         
         BOOL correctQuery=NO;
         
-        correctQuery = [db executeUpdate:@"CREATE TABLE IF NOT EXISTS 'users' ('id' INTEGER PRIMARY KEY  AUTOINCREMENT  NOT NULL  UNIQUE , 'url' VARCHAR, 'ssl' BOOL, 'activeaccount' BOOL, 'storage_occupied' LONG NOT NULL DEFAULT 0, 'storage' LONG NOT NULL DEFAULT 0, 'has_share_api_support' INTEGER NOT NULL DEFAULT 0, 'has_sharee_api_support' INTEGER NOT NULL DEFAULT 0, 'has_cookies_support' INTEGER NOT NULL DEFAULT 0, 'has_forbidden_characters_support' INTEGER NOT NULL DEFAULT 0, 'has_capabilities_support' INTEGER NOT NULL DEFAULT 0, 'image_instant_upload' BOOL NOT NULL DEFAULT 0, 'video_instant_upload' BOOL NOT NULL DEFAULT 0, 'background_instant_upload' BOOL NOT NULL DEFAULT 0, 'path_instant_upload' VARCHAR, 'only_wifi_instant_upload' BOOL NOT NULL DEFAULT 0, 'timestamp_last_instant_upload_image' DOUBLE, 'timestamp_last_instant_upload_video' DOUBLE, 'url_redirected' VARCHAR, 'sorting_type' INTEGER NOT NULL DEFAULT 0, 'predefined_url' VARCHAR)"];
+        correctQuery = [db executeUpdate:@"CREATE TABLE IF NOT EXISTS 'users' ('id' INTEGER PRIMARY KEY  AUTOINCREMENT  NOT NULL  UNIQUE , 'url' VARCHAR, 'ssl' BOOL, 'activeaccount' BOOL, 'storage_occupied' LONG NOT NULL DEFAULT 0, 'storage' LONG NOT NULL DEFAULT 0, 'has_share_api_support' INTEGER NOT NULL DEFAULT 0, 'has_sharee_api_support' INTEGER NOT NULL DEFAULT 0, 'has_cookies_support' INTEGER NOT NULL DEFAULT 0, 'has_forbidden_characters_support' INTEGER NOT NULL DEFAULT 0, 'has_capabilities_support' INTEGER NOT NULL DEFAULT 0, 'image_instant_upload' BOOL NOT NULL DEFAULT 0, 'video_instant_upload' BOOL NOT NULL DEFAULT 0, 'background_instant_upload' BOOL NOT NULL DEFAULT 0, 'path_instant_upload' VARCHAR, 'only_wifi_instant_upload' BOOL NOT NULL DEFAULT 0, 'timestamp_last_instant_upload_image' DOUBLE, 'timestamp_last_instant_upload_video' DOUBLE, 'url_redirected' VARCHAR, 'sorting_type' INTEGER NOT NULL DEFAULT 0, 'predefined_url' VARCHAR, has_fed_shares_option_share_support INTEGER NOT NULL DEFAULT 0, has_public_share_link_option_name_support INTEGER NOT NULL DEFAULT 0, has_public_share_link_option_upload_only_support INTEGER NOT NULL DEFAULT 0)"];
         
         if (!correctQuery) {
             DLog(@"Error in createDataBase table users");
         }
         
-        correctQuery = [db executeUpdate:@"CREATE TABLE IF NOT EXISTS 'files' ('id' INTEGER PRIMARY KEY  AUTOINCREMENT  NOT NULL  UNIQUE, 'file_path' VARCHAR, 'file_name' VARCHAR, 'user_id' INTEGER, 'is_directory' BOOL, 'is_download' INTEGER, 'file_id' INTEGER, 'size' LONG, 'date' LONG, 'is_favorite' BOOL, 'etag' VARCHAR NOT NULL DEFAULT '', 'is_root_folder' BOOL NOT NULL DEFAULT 0, 'is_necessary_update' BOOL NOT NULL DEFAULT 0, 'shared_file_source' INTEGER NOT NULL DEFAULT 0, 'permissions' VARCHAR NOT NULL DEFAULT '', 'task_identifier' INTEGER NOT NULL DEFAULT -1, 'providing_file_id' INTEGER NOT NULL DEFAULT 0, 'oc_id' VARCHAR NOT NULL DEFAULT '')"];
+        correctQuery = [db executeUpdate:@"CREATE TABLE IF NOT EXISTS 'files' ('id' INTEGER PRIMARY KEY  AUTOINCREMENT  NOT NULL  UNIQUE, 'file_path' VARCHAR, 'file_name' VARCHAR, 'user_id' INTEGER, 'is_directory' BOOL, 'is_download' INTEGER, 'file_id' INTEGER, 'size' LONG, 'date' LONG, 'is_favorite' BOOL, 'etag' VARCHAR NOT NULL DEFAULT '', 'is_root_folder' BOOL NOT NULL DEFAULT 0, 'is_necessary_update' BOOL NOT NULL DEFAULT 0, 'shared_file_source' INTEGER NOT NULL DEFAULT 0, 'permissions' VARCHAR NOT NULL DEFAULT '', 'task_identifier' INTEGER NOT NULL DEFAULT -1, 'providing_file_id' INTEGER NOT NULL DEFAULT 0, 'oc_id' VARCHAR NOT NULL DEFAULT '', 'oc_privatelink' VARCHAR NOT NULL DEFAULT '')"];
         
         if (!correctQuery) {
             DLog(@"Error in createDataBase table files");
         }
         
-        correctQuery = [db executeUpdate:@"CREATE TABLE IF NOT EXISTS 'files_backup' ('id' INTEGER, 'file_path' VARCHAR, 'file_name' VARCHAR, 'user_id' INTEGER, 'is_directory' BOOL, 'is_download' INTEGER, 'file_id' INTEGER, 'size' LONG, 'date' LONG, 'is_favorite' BOOL, 'etag' VARCHAR NOT NULL DEFAULT '', 'is_root_folder' BOOL, 'is_necessary_update' BOOL, 'shared_file_source' INTEGER, 'permissions' VARCHAR NOT NULL DEFAULT '', 'task_identifier' INTEGER, 'providing_file_id' INTEGER NOT NULL DEFAULT 0, 'oc_id' VARCHAR NOT NULL DEFAULT '')"];
+        correctQuery = [db executeUpdate:@"CREATE TABLE IF NOT EXISTS 'files_backup' ('id' INTEGER, 'file_path' VARCHAR, 'file_name' VARCHAR, 'user_id' INTEGER, 'is_directory' BOOL, 'is_download' INTEGER, 'file_id' INTEGER, 'size' LONG, 'date' LONG, 'is_favorite' BOOL, 'etag' VARCHAR NOT NULL DEFAULT '', 'is_root_folder' BOOL, 'is_necessary_update' BOOL, 'shared_file_source' INTEGER, 'permissions' VARCHAR NOT NULL DEFAULT '', 'task_identifier' INTEGER, 'providing_file_id' INTEGER NOT NULL DEFAULT 0, 'oc_id' VARCHAR NOT NULL DEFAULT '', 'oc_privatelink' VARCHAR NOT NULL DEFAULT '')"];
         
         if (!correctQuery) {
             DLog(@"Error in createDataBase table files_backup");
@@ -618,7 +618,7 @@
 /**
  * Changes:
  *
- * Migrate the current usersname and password stored in users table to the new keychain
+ * Migrate the current username and password stored in users table to the new keychain
  * Do a backup of the users table in users_backup table
  * Remove users table
  * Create a new users table without username and password
@@ -631,8 +631,7 @@
     NSArray *currentUsers = [NSArray arrayWithArray:[ManageUsersDB getAllOldUsersUntilVersion10]];
     
     for (UserDto *user in currentUsers) {
-         NSString *idString = [NSString stringWithFormat:@"%ld", (long)user.idUser];
-        if (![OCKeychain setCredentialsById:idString withUsername:user.username andPassword:user.password]){
+        if (![OCKeychain storeCredentialsOfUserFromDBVersion9To10:user]){
             DLog(@"Failed setting credentials");
         }
         
@@ -1257,6 +1256,59 @@
         
     }];
 
+}
+
+
+
++ (void) updateDBVersion21To22 {
+    
+    //Alter users table to add more supported share options
+    
+    FMDatabaseQueue *queue = Managers.sharedDatabase;
+    
+    [queue inTransaction:^(FMDatabase *db, BOOL *rollback) {
+        
+        BOOL dbOperationSuccessful;
+        
+        dbOperationSuccessful =[db executeUpdate:@"ALTER TABLE users ADD has_fed_shares_option_share_support INTEGER NOT NULL DEFAULT 0"];
+        if (!dbOperationSuccessful) {
+            DLog(@"Error update version 21 to 22 table users add column has_fed_shares_option_share_support");
+        }
+        
+        dbOperationSuccessful =[db executeUpdate:@"ALTER TABLE users ADD has_public_share_link_option_name_support INTEGER NOT NULL DEFAULT 0"];
+        if (!dbOperationSuccessful) {
+            DLog(@"Error update version 21 to 22 table users add column has_public_share_link_option_name_support");
+        }
+        
+        dbOperationSuccessful =[db executeUpdate:@"ALTER TABLE users ADD has_public_share_link_option_upload_only_support INTEGER NOT NULL DEFAULT 0"];
+        if (!dbOperationSuccessful) {
+            DLog(@"Error update version 21 to 22 table users add column has_public_share_link_option_upload_only_support");
+        }
+        
+    }];
+    
+}
+
++ (void) updateDBVersion24To25 {
+    
+    FMDatabaseQueue *queue = Managers.sharedDatabase;
+    
+    [queue inTransaction:^(FMDatabase *db, BOOL *rollback) {
+        
+        BOOL dbOperationSuccessful;
+        
+        dbOperationSuccessful = [db executeUpdate:@"ALTER TABLE files ADD oc_privatelink VARCHAR NOT NULL DEFAULT ''"];
+        if (!dbOperationSuccessful) {
+            DLog(@"Error update version 22 to 23 table files oc_privatelink");
+        }
+        
+        dbOperationSuccessful = [db executeUpdate:@"ALTER TABLE files_backup ADD oc_privatelink VARCHAR NOT NULL DEFAULT ''"];
+        if (!dbOperationSuccessful) {
+            DLog(@"Error update version 22 to 23 table files_backup oc_privatelink");
+        }
+    
+    }];
+    
 }
 
 

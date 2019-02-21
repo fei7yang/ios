@@ -18,6 +18,7 @@
 
 #import "ManageFilesDB.h"
 #import "UserDto.h"
+#import "ManageUsersDB.h"
 
 @implementation FileListDBOperations
 
@@ -37,7 +38,7 @@
             
             DLog(@"Current folder to create: %@%@",currentFile.filePath, currentFile.fileName);
             
-            NSString *currentLocalFileToCreateFolder = [NSString stringWithFormat:@"%@%@",localFolder,[currentFile.fileName stringByReplacingPercentEscapesUsingEncoding:NSUTF8StringEncoding]];
+            NSString *currentLocalFileToCreateFolder = [NSString stringWithFormat:@"%@%@",localFolder,[currentFile.fileName stringByRemovingPercentEncoding]];
             
             DLog(@"currentLocalFileToCreateFolder: %@", currentLocalFileToCreateFolder);
             
@@ -67,7 +68,7 @@
     initialRootFolder.ocId = @"";
     initialRootFolder.filePath = @"";
     initialRootFolder.fileName = @"";
-    initialRootFolder.userId = user.idUser;
+    initialRootFolder.userId = user.userId;
     initialRootFolder.isDirectory = YES;
     initialRootFolder.isDownload = notDownload;
     initialRootFolder.fileId = -1;
@@ -81,6 +82,7 @@
     initialRootFolder.permissions = @"";
     initialRootFolder.taskIdentifier = -1;
     initialRootFolder.providingFileId = 0;
+    initialRootFolder.ocPrivatelink = @"";
     
     [ManageFilesDB insertFile:initialRootFolder];
     
@@ -115,7 +117,16 @@
     DLog(@"name: %@", currentFolder.fileName);
     
   //  NSMutableArray *directoryList = [[req getDirectoryList] mutableCopy];
-    [ManageFilesDB insertManyFiles:arrayFromServer andFileId:currentFolder.idFile];
+    
+     UserDto *user;
+#ifdef CONTAINER_APP
+    AppDelegate *app = (AppDelegate *)[[UIApplication sharedApplication] delegate];
+    user = app.activeUser;
+#else
+    user = [ManageUsersDB getActiveUser];
+#endif
+    
+    [ManageFilesDB insertManyFiles:arrayFromServer ofFileId:currentFolder.idFile andUser:user];
     
     //Read all backups folders and update on the old files related with the new ids
     [ManageFilesDB updateRelatedFilesFromBackup];
@@ -139,7 +150,7 @@
     
     DLog(@"Current folder to create: %@", folderName);
     
-    NSString *currentLocalFileToCreateFolder = [NSString stringWithFormat:@"%@%@",localFolder,[folderName stringByReplacingPercentEscapesUsingEncoding:NSUTF8StringEncoding]];
+    NSString *currentLocalFileToCreateFolder = [NSString stringWithFormat:@"%@%@",localFolder,[folderName stringByRemovingPercentEncoding]];
     
     DLog(@"currentLocalFileToCreateFolder: %@", currentLocalFileToCreateFolder);
     
@@ -154,6 +165,46 @@
     }
 }
 
+/*
+ * This method receive the new array of the server and store the changes
+ * in the Database and in the tableview
+ * @param requestArray -> NSArray of path items
+ */
++(void)deleteOldDataFromDBBeforeRefresh:(NSArray *) requestArray parent:(FileDto *) parentFileDTO {
+
+    UserDto *activeUser = [ManageUsersDB getActiveUser];
+    NSMutableArray *directoryList = [NSMutableArray arrayWithArray:requestArray];
+
+    NSString *subfolders = [UtilsUrls getServerSubfolders: activeUser];
+    NSString *stringToTrim = [[NSString alloc] init];
+    if (subfolders == nil) {
+        stringToTrim = k_url_webdav_server_with_first_slash;
+    } else {
+        stringToTrim = [subfolders stringByAppendingString:k_url_webdav_server];
+    }
+
+    //Change the filePath from the library to our db format
+    for (FileDto *currentFile in directoryList) {
+        currentFile.filePath = [currentFile.filePath stringByReplacingOccurrencesOfString:stringToTrim withString:@""];
+    }
+
+    for (int i = 0 ; i < directoryList.count ; i++) {
+
+        FileDto *currentFile = [directoryList objectAtIndex:i];
+
+        if (currentFile.fileName == nil) {
+            //This is the fileDto of the current father folder
+            parentFileDTO.etag = currentFile.etag;
+
+            //We update the current folder with the new etag
+            [ManageFilesDB updateEtagOfFileDtoByid:parentFileDTO.idFile andNewEtag: currentFile.etag];
+        }
+    }
+
+    FileDto *upatedParent = [ManageFilesDB getFileDtoByFileName:parentFileDTO.fileName andFilePath:[UtilsUrls getFilePathOnDBByFilePathOnFileDto:parentFileDTO.filePath andUser: activeUser] andUser:activeUser];
+
+    [FileListDBOperations makeTheRefreshProcessWith:directoryList inThisFolder:upatedParent.idFile];
+}
 
 
 @end

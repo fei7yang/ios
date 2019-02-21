@@ -69,7 +69,7 @@
     
     NSString *ext=[self getExtension:fileName];
     
-    if([ext isEqualToString:@"JPG"] || [ext isEqualToString:@"PNG"] || [ext isEqualToString:@"TIFF"] || [ext isEqualToString:@"TIF"] || [ext isEqualToString:@"BMP"] || [ext isEqualToString:@"JPEG"])
+    if([ext isEqualToString:@"JPG"] || [ext isEqualToString:@"PNG"] || [ext isEqualToString:@"TIFF"] || [ext isEqualToString:@"TIF"] || [ext isEqualToString:@"BMP"] || [ext isEqualToString:@"JPEG"] || [ext isEqualToString:@"HEIC"])
     {
         return YES;
     }
@@ -289,28 +289,6 @@
         }
     }
     return NO;
-}
-
-
-+ (NSString *)getTheNameOfTheBrandImage{
-    
-    NSString *imageName;
-    
-    //Default name
-    imageName = @"BackRootFolderIcon";
-    NSString *appName = [[NSBundle mainBundle] objectForInfoDictionaryKey:@"CFBundleDisplayName"];
-    //The special icon for chritmats only for ownCloud app
-    if ([appName isEqualToString:@"ownCloud"]) {
-        // After day 354 of the year, the usual ownCloud icon is replaced by another icon
-        NSCalendar *gregorian =
-        [[NSCalendar alloc] initWithCalendarIdentifier:NSCalendarIdentifierGregorian];
-        NSUInteger dayOfYear = [gregorian ordinalityOfUnit:NSCalendarUnitDay inUnit:NSCalendarUnitYear forDate:[NSDate date]];
-        if (dayOfYear >= 354)
-            imageName = @"ownCloud-xmas";
-        
-    }
-    
-    return imageName;
 }
 
 

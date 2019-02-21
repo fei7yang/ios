@@ -6,7 +6,7 @@
 //
 
 /*
- Copyright (C) 2016, ownCloud GmbH.
+ Copyright (C) 2017, ownCloud GmbH.
  This code is covered by the GNU Public License Version 3.
  For distribution utilizing Apple mechanisms please see https://owncloud.org/contribute/iOS-license-exception/
  You should have received a copy of this license
@@ -51,15 +51,6 @@ NSString *FavoriteFileIsSync = @"FavoriteFileIsSync";
 }
 
 
-///-----------------------------------
-/// @name isOnAnUpdatingProcessThisFavoriteFile
-///-----------------------------------
-
-/**
- * This method checks if the file is currently on an updating process. It is check by fileName, filePath and userId
- *
- * @param favoriteFile > FileDto. The file which is going to be checked
- */
 - (BOOL) isOnAnUpdatingProcessThisFavoriteFile:(FileDto *)favoriteFile {
 
     //Create a copy of the favorite array
@@ -85,46 +76,22 @@ NSString *FavoriteFileIsSync = @"FavoriteFileIsSync";
 }
 
 
-///-----------------------------------
-/// @name Sync All Favorites of User
-///-----------------------------------
-
-/**
- * Method that begin a process to update all favorites files of a specific user
- *
- * 1.- Get all favorites of a specific user
- *
- * 2.- Send the list to a specific method to update the favorites
- *
- * @param NSInteger -> userId
- *
- */
-
 - (void) syncAllFavoritesOfUser:(NSInteger)userId{
    
-    NSArray *dataBaseFavorites = [ManageFilesDB getAllFavoritesFilesOfUserId:userId];
-    
-    [self syncFavoritesOfList:dataBaseFavorites ofThisUser:userId];
-    
+    dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+        
+        NSArray *dataBaseFavorites = [ManageFilesDB getAllFavoritesFilesOfUserId:userId];
+        [self syncFavoritesOfList:dataBaseFavorites ofThisUser:userId];
+    });
 }
 
 
-///-----------------------------------
-/// @name Sync Favorites of Folder with User
-///-----------------------------------
-
-/**
- * Method that begin a process to sync favorites of a specific path and user
- *
- * @param idFolder -> NSInteger
- * @param userId -> NSInteger
- *
- */
 - (void) syncFavoritesOfFolder:(FileDto *)folder withUser:(NSInteger)userId {
     
-    NSArray *dataBaseFavorites = [ManageFilesDB getAllFavoritesByFolder:folder];
-    [self syncFavoritesOfList:dataBaseFavorites ofThisUser:userId];
-    
+    dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+        NSArray *dataBaseFavorites = [ManageFilesDB getAllFavoritesByFolder:folder];
+        [self syncFavoritesOfList:dataBaseFavorites ofThisUser:userId];
+    });
 }
 
 ///-----------------------------------
@@ -138,7 +105,7 @@ NSString *FavoriteFileIsSync = @"FavoriteFileIsSync";
  */
 - (void) syncFavoritesOfList:(NSArray*)favoritesFilesAndFolders ofThisUser:(NSInteger)userId{
     
-    UserDto *user = [ManageUsersDB getUserByIdUser:userId];
+    UserDto *user = [ManageUsersDB getUserByUserId:userId];
     
     //Loop for favorites
     for (FileDto *file in favoritesFilesAndFolders) {
@@ -147,7 +114,7 @@ NSString *FavoriteFileIsSync = @"FavoriteFileIsSync";
         NSString *serverPath = [UtilsUrls getFullRemoteServerPathWithWebDav:user];
         NSString *path = [NSString stringWithFormat:@"%@%@%@",serverPath, [UtilsUrls getFilePathOnDBByFilePathOnFileDto:file.filePath andUser:user], file.fileName];
         
-        path = [path stringByReplacingPercentEscapesUsingEncoding:NSUTF8StringEncoding];
+        path = [path stringByRemovingPercentEncoding];
         
         //Check if the file is including in the sync files
         if (![self isOnAnUpdatingProcessThisFavoriteFile:file]) {
@@ -208,8 +175,8 @@ NSString *FavoriteFileIsSync = @"FavoriteFileIsSync";
                                 //Data to download
                                 //Get the current local folder
                                 AppDelegate *app = (AppDelegate*)[[UIApplication sharedApplication] delegate];
-                                NSString *currentLocalFolder = [NSString stringWithFormat:@"%@%ld/%@", [UtilsUrls getOwnCloudFilePath],(long)user.idUser, [UtilsUrls getFilePathOnDBByFilePathOnFileDto:updatedFile.filePath andUser:user]];
-                                currentLocalFolder = [currentLocalFolder stringByReplacingPercentEscapesUsingEncoding:NSUTF8StringEncoding];
+                                NSString *currentLocalFolder = [NSString stringWithFormat:@"%@%ld/%@", [UtilsUrls getOwnCloudFilePath],(long)user.userId, [UtilsUrls getFilePathOnDBByFilePathOnFileDto:updatedFile.filePath andUser:user]];
+                                currentLocalFolder = [currentLocalFolder stringByRemovingPercentEncoding];
                                 
                                 Download *download = [Download new];
                                 download.delegate =self;
@@ -254,15 +221,6 @@ NSString *FavoriteFileIsSync = @"FavoriteFileIsSync";
 }
 
 
-///-----------------------------------
-/// @name Remove of sync process file
-///-----------------------------------
-
-/**
- * Method that find the equal file stored in _favoritesSyncing and remove it
- *
- * @param file -> FileDto
- */
 - (void) removeOfSyncProcessFile:(FileDto*)file{
     
     FileDto *fileDto = [self getFileEqualTo:file];
@@ -303,26 +261,10 @@ NSString *FavoriteFileIsSync = @"FavoriteFileIsSync";
 }
 
 
-///-----------------------------------
-/// @name thereIsANewVersionAvailableOfThisFile
-///-----------------------------------
-
-/**
- * This method check if there is a new version on the server for a concret file
- *
- * @param favoriteFile -> FileDto
- */
 - (void) thereIsANewVersionAvailableOfThisFile: (FileDto *)favoriteFile {
     AppDelegate *app = (AppDelegate *)[[UIApplication sharedApplication]delegate];
     
-    //Set the right credentials
-    if (k_is_sso_active) {
-        [[AppDelegate sharedOCCommunication] setCredentialsWithCookie:app.activeUser.password];
-    } else if (k_is_oauth_active) {
-        [[AppDelegate sharedOCCommunication] setCredentialsOauthWithToken:app.activeUser.password];
-    } else {
-        [[AppDelegate sharedOCCommunication] setCredentialsWithUser:app.activeUser.username andPassword:app.activeUser.password];
-    }
+    [[AppDelegate sharedOCCommunication] setCredentials:app.activeUser.credDto];
     
     [[AppDelegate sharedOCCommunication] setUserAgent:[UtilsUrls getUserAgent]];
     
@@ -330,7 +272,7 @@ NSString *FavoriteFileIsSync = @"FavoriteFileIsSync";
     NSString *serverPath = [UtilsUrls getFullRemoteServerPathWithWebDav:app.activeUser];
     NSString *path = [NSString stringWithFormat:@"%@%@%@",serverPath, [UtilsUrls getFilePathOnDBByFilePathOnFileDto:favoriteFile.filePath andUser:app.activeUser], favoriteFile.fileName];
     
-    path = [path stringByReplacingPercentEscapesUsingEncoding:NSUTF8StringEncoding];
+    path = [path stringByRemovingPercentEncoding];
     
     [[AppDelegate sharedOCCommunication] readFile:path onCommunication:[AppDelegate sharedOCCommunication] successRequest:^(NSHTTPURLResponse *response, NSArray *items, NSString *redirectedServer) {
         
@@ -400,11 +342,7 @@ NSString *FavoriteFileIsSync = @"FavoriteFileIsSync";
     return isSonOfFavorite;
 }
 
-/**
- * This method mark all files and folders behind "folder" as not favorites
- *
- * @param folder > FileDto. The folder parent
- */
+
 - (void) setAllFilesAndFoldersAsNoFavoriteBehindFolder:(FileDto *) folder {
     NSMutableArray *listOfFoldersToMarkAsNotFavorite = [NSMutableArray new];
     [listOfFoldersToMarkAsNotFavorite addObject:folder];
@@ -466,32 +404,18 @@ NSString *FavoriteFileIsSync = @"FavoriteFileIsSync";
 
 #pragma mark - Update just single file
 
-///-----------------------------------
-/// @name downloadSingleFavoriteFileSonOfFavoriteFolder
-///-----------------------------------
-
-/**
- * Method force the download of a favorite file son of a favorite folder
- */
 - (void) downloadSingleFavoriteFileSonOfFavoriteFolder:(FileDto *) file {
     AppDelegate *app = (AppDelegate *)[[UIApplication sharedApplication]delegate];
     
-    //Set the right credentials
-    if (k_is_sso_active) {
-        [[AppDelegate sharedOCCommunication] setCredentialsWithCookie:app.activeUser.password];
-    } else if (k_is_oauth_active) {
-        [[AppDelegate sharedOCCommunication] setCredentialsOauthWithToken:app.activeUser.password];
-    } else {
-        [[AppDelegate sharedOCCommunication] setCredentialsWithUser:app.activeUser.username andPassword:app.activeUser.password];
-    }
-    
+    [[AppDelegate sharedOCCommunication] setCredentials:app.activeUser.credDto];
+
     [[AppDelegate sharedOCCommunication] setUserAgent:[UtilsUrls getUserAgent]];
     
     //FileName full path
     NSString *serverPath = [UtilsUrls getFullRemoteServerPathWithWebDav:app.activeUser];
     NSString *path = [NSString stringWithFormat:@"%@%@%@",serverPath, [UtilsUrls getFilePathOnDBByFilePathOnFileDto:file.filePath andUser:app.activeUser], file.fileName];
     
-    path = [path stringByReplacingPercentEscapesUsingEncoding:NSUTF8StringEncoding];
+    path = [path stringByRemovingPercentEncoding];
     
     [[AppDelegate sharedOCCommunication] readFile:path onCommunication:[AppDelegate sharedOCCommunication] successRequest:^(NSHTTPURLResponse *response, NSArray *items, NSString *redirectedServer) {
         

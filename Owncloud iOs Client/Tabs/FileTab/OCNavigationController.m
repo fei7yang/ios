@@ -72,7 +72,9 @@
     
     // Custom initialization
     
-    self.navigationBar.barTintColor = [UIColor colorOfNavigationBar];
+    if (@available(iOS 11.0, *)) {
+        self.navigationBar.prefersLargeTitles = NO;
+    }
     
     [self.navigationBar setBackgroundImage:[ImageUtils imageWithColor:[UIColor colorOfBackgroundNavBarImage]] forBarMetrics:UIBarMetricsDefault];
     
@@ -110,7 +112,10 @@
 #endif
         _backgroundView = [[PassthroughView alloc] initWithFrame:bgFrame];
         _backgroundView.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
-        _backgroundView.backgroundColor = [UIColor colorOfNavigationBar];
+#ifdef SHARE_IN
+#else
+		_backgroundView.backgroundColor = [UIColor colorOfNavigationBar];
+#endif
         _backgroundView.alpha = 0.6;
         [self.navigationBar addSubview:_backgroundView];
         [self.navigationBar sendSubviewToBack:_backgroundView];

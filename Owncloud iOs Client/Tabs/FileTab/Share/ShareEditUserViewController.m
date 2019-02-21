@@ -16,6 +16,7 @@
 
 #import "ShareEditUserViewController.h"
 #import "ManageFilesDB.h"
+#import "ManageCapabilitiesDB.h"
 #import "UtilsUrls.h"
 #import "OCSharedDto.h"
 #import "Owncloud_iOs_Client-Swift.h"
@@ -23,7 +24,6 @@
 #import "UIColor+Constants.h"
 #import "OCNavigationController.h"
 #import "ManageUsersDB.h"
-#import "EditAccountViewController.h"
 #import "Customization.h"
 #import "ManageSharesDB.h"
 #import "UtilsFramework.h"
@@ -54,8 +54,8 @@
 #define heightOfShareLinkHeader 45.0
 #define heightOfHeader 10.0
 
-#define shareTableViewSectionsNumber  3
-#define shareTableViewSectionsNumberRemote  2
+#define shareTableViewSectionsNumber 3
+#define shareTableViewSectionsNumberCanNotShare 2
 
 //Nº of Rows
 #define fullOptionsForCanEditOption 3
@@ -78,11 +78,11 @@
 @property (nonatomic, strong) ShareFileOrFolder* sharedFileOrFolder;
 @property (nonatomic, strong) MBProgressHUD* loadingView;
 @property (nonatomic, strong) UIActivityViewController *activityView;
-@property (nonatomic, strong) EditAccountViewController *resolveCredentialErrorViewController;
+@property (nonatomic, strong) UniversalLoginViewController *resolveCredentialErrorViewController;
 @property (nonatomic, strong) UIPopoverController* activityPopoverController;
 
 //Enum to restore the option after get an error
-typedef NS_ENUM (NSInteger, enumUpload){
+typedef NS_ENUM (NSInteger, optionPermission){
     optionPermissionNothingYet=0,
     optionPermissionCanEdit=1,
     optionPermissionCanCreate=2,
@@ -166,25 +166,20 @@ typedef NS_ENUM (NSInteger, enumUpload){
     
     AppDelegate *app = (AppDelegate *)[[UIApplication sharedApplication]delegate];
     
-    NSInteger permissionValue = [UtilsFramework getPermissionsValueByCanEdit:self.canEditEnabled andCanCreate:self.canCreateEnabled andCanChange:self.canChangeEnabled andCanDelete:self.canDeleteEnabled andCanShare:self.canShareEnabled andIsFolder:self.sharedItem.isDirectory];
+	NSInteger permissionValue = [UtilsFramework getPermissionsValueByCanRead:YES andCanEdit:self.canEditEnabled andCanCreate:self.canCreateEnabled andCanChange:self.canChangeEnabled andCanDelete:self.canDeleteEnabled andCanShare:self.canShareEnabled andIsFolder:self.sharedItem.isDirectory];
     
     //We update the permission only if the permissions are differents than the current ones
     if (permissionValue != self.updatedOCShare.permissions) {
         
         [self initLoading];
         
-        //Set the right credentials
-        if (k_is_sso_active) {
-            [[AppDelegate sharedOCCommunication] setCredentialsWithCookie:APP_DELEGATE.activeUser.password];
-        } else if (k_is_oauth_active) {
-            [[AppDelegate sharedOCCommunication] setCredentialsOauthWithToken:APP_DELEGATE.activeUser.password];
-        } else {
-            [[AppDelegate sharedOCCommunication] setCredentialsWithUser:APP_DELEGATE.activeUser.username andPassword:APP_DELEGATE.activeUser.password];
-        }
+        [[AppDelegate sharedOCCommunication] setCredentials:APP_DELEGATE.activeUser.credDto];
         
         [[AppDelegate sharedOCCommunication] setUserAgent:[UtilsUrls getUserAgent]];
         
-        [[AppDelegate sharedOCCommunication] updateShare:self.updatedOCShare.idRemoteShared ofServerPath:app.activeUser.url withPasswordProtect:nil andExpirationTime:nil andPermissions:permissionValue onCommunication:[AppDelegate sharedOCCommunication] successRequest:^(NSHTTPURLResponse *response, NSString *redirectedServer) {
+
+        //TODO:check "ofServerPath" with redirected server, it should be [UtilsUrls getFullRemoteServerPath
+        [[AppDelegate sharedOCCommunication] updateShare:self.updatedOCShare.idRemoteShared ofServerPath:app.activeUser.url withPasswordProtect:nil andExpirationTime:nil andPublicUpload:nil andLinkName:nil andPermissions:permissionValue onCommunication:[AppDelegate sharedOCCommunication] successRequest:^(NSHTTPURLResponse *response, NSData *responseData, NSString *redirectedServer) {
             
             BOOL isSamlCredentialsError=NO;
             
@@ -199,7 +194,7 @@ typedef NS_ENUM (NSInteger, enumUpload){
             }
             if (!isSamlCredentialsError) {
                 self.updatedOCShare.permissions = permissionValue;
-                [ManageSharesDB updateTheRemoteShared:self.updatedOCShare.idRemoteShared forUser:APP_DELEGATE.activeUser.idUser withPermissions:permissionValue];
+                [ManageSharesDB updateTheRemoteShared:self.updatedOCShare.idRemoteShared forUser:APP_DELEGATE.activeUser.userId withPermissions:permissionValue];
                 [self endLoading];
                 [self reloadView];
             }
@@ -265,12 +260,19 @@ typedef NS_ENUM (NSInteger, enumUpload){
 
 - (NSInteger)numberOfSectionsInTableView:(UITableView *)tableView{
     
+    int numberOfSections = shareTableViewSectionsNumber;
+    
     if (self.updatedOCShare.shareType == shareTypeRemote) {
         if (!(APP_DELEGATE.activeUser.hasFedSharesOptionShareSupport == serverFunctionalitySupported)) {
-            return shareTableViewSectionsNumberRemote;
+            numberOfSections = shareTableViewSectionsNumberCanNotShare;
         }
     }
-    return shareTableViewSectionsNumber;
+    
+    if (![ManageCapabilitiesDB getCapabilitiesOfUserId:APP_DELEGATE.activeUser.userId].isFilesSharingReSharingEnabled) {
+        numberOfSections = shareTableViewSectionsNumberCanNotShare;
+    }
+    
+    return numberOfSections;
 }
 
 - (NSInteger)tableView:(UITableView *)tableView numberOfRowsInSection:(NSInteger)section {
@@ -601,7 +603,8 @@ typedef NS_ENUM (NSInteger, enumUpload){
 #ifdef CONTAINER_APP
     
     //Edit Account
-    self.resolveCredentialErrorViewController = [[EditAccountViewController alloc]initWithNibName:@"EditAccountViewController_iPhone" bundle:nil andUser:[ManageUsersDB getActiveUser] andLoginMode:LoginModeExpire];
+    
+    self.resolveCredentialErrorViewController = [UtilsLogin getLoginVCWithMode:LoginModeExpire andUser:APP_DELEGATE.activeUser];
     
     if (IS_IPHONE) {
         OCNavigationController *navController = [[OCNavigationController alloc] initWithRootViewController:self.resolveCredentialErrorViewController];

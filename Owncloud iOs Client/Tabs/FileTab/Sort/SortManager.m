@@ -47,11 +47,11 @@
     
     if([currentDirectoryArray count] > 0 && user.sortingType == sortByName){
         rows = [[sortedArray objectAtIndex:section] count];
-    }
     
-    else{
+    } else {
+        
         //If the _currentDirectoryArray is empty it will have one extra row to show a message in FilesViewController and SimpleFileListTableViewController. If no alphabetical order is required will also be used one row for each section for usual contents
-        if (([currentDirectoryArray count] == 0 && emptyMessageRow) || ([currentDirectoryArray count] > 0 && user.sortingType == sortByModificationDate)) {
+        if (([currentDirectoryArray count] == 0 && emptyMessageRow) || ([currentDirectoryArray count] > 0 && (user.sortingType == sortByModificationDate || user.sortingType == sortByKind))) {
             rows = 1;
         }
     }
@@ -63,15 +63,20 @@
 
 {
     if(user.sortingType == sortByName){
-        //Only show the section title if there are rows in it
-        BOOL showSection = [[sortedArray objectAtIndex:section] count] != 0;
-        NSArray *titles = [[UILocalizedIndexedCollation currentCollation] sectionTitles];
+        //Only show the section title if there are files in it and there are more files than minimun files to show index
         
-        if(k_minimun_files_to_show_separators > [currentDirectoryArray count]) {
-            showSection = NO;
+        NSArray *titles = [[UILocalizedIndexedCollation currentCollation] sectionTitles];
+
+        BOOL showSection = NO;
+        if ([currentDirectoryArray count] > 0 &&
+            [currentDirectoryArray count] > k_minimun_files_to_show_separators &&
+            [sortedArray count] >= section ) {
+            
+            showSection = [[sortedArray objectAtIndex:section] count] > 0;
         }
-        return (showSection) ? [titles objectAtIndex:section] : nil;}
-    else return nil;
+        return (showSection) ? [titles objectAtIndex:section] : nil;
+    
+    } else return nil;
 }
 
 // Returns the titles for the sections for a table view.
@@ -136,6 +141,30 @@
 }
 
 /*
+ * This method sorts an array by kind and configure ot to be used in file lists
+ */
++ (NSMutableArray*) sortByKind:(NSArray*)array {
+
+  DLog(@"sortByKind");
+  NSSortDescriptor *descriptorExtension = [[NSSortDescriptor alloc]
+                                           initWithKey:@"fileName" ascending:YES comparator:^NSComparisonResult(NSString* obj1, NSString *obj2) {
+                                             return [obj1.pathExtension compare:obj2.pathExtension options:NSCaseInsensitiveSearch];
+                                           }];
+  NSSortDescriptor *descriptorFilename = [[NSSortDescriptor alloc] initWithKey:@"fileName" ascending:YES];
+  NSArray *descriptors=[NSArray arrayWithObjects:descriptorExtension, descriptorFilename, nil];
+  array = [array sortedArrayUsingDescriptors:descriptors];
+
+  // an array with another array is needed to follow alphabetical sorting mode
+  NSMutableArray *sortedArrayWithArray = [[NSMutableArray alloc] init];
+
+  for (int i=0; i<array.count; i++) {
+    [sortedArrayWithArray addObject:[NSArray arrayWithObject:array[i]]];
+  }
+
+  return sortedArrayWithArray;
+}
+
+/*
  * This method sorts an array to be shown in the files/folders list
  */
 + (NSMutableArray*) getSortedArrayFromCurrentDirectoryArray:(NSArray*) currentDirectoryArray forUser:(UserDto*)user {
@@ -149,7 +178,10 @@
         case sortByModificationDate:
             sortedArray = [self sortByModificationDate:currentDirectoryArray];
             break;
-            
+        case sortByKind:
+            sortedArray = [self sortByKind:currentDirectoryArray];
+            break;
+
         default:
             DLog(@"Unknown sorted type");
             break;

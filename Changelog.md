@@ -1,3 +1,56 @@
+## 3.8.0 (Aug 2018)
+- New look for public link view
+- Add control of reshares for the content owner
+- Fix problem in the browsability of target folder selection
+- Fix full screen in MSOffice documents for iPad
+- Bug fixing
+
+## 3.7.5 (May 2018)
+- Private link 
+- Sort the file list by kind of file
+- Improve iPhoneX support
+- Use WKWebView to display interactive content
+- Fix preview of xls files
+- Improve capability support for resharing
+- Bug fixing
+
+## 3.7.3 (March 2018)
+- Support whiteListed apps for all iOS version supported
+- Fix preview of files (iPad)
+- Fix save to camera roll from preview of file
+- Fix share from other app with "import/export with ownCloud" option
+- Other bug fixing and stability improvements
+
+## 3.7.2 (January 2018)
+- This release brings important bug fixes for some users, iOS11 and iPhoneX support.
+- Fix an issue related with the loss of credentials after the upgrade from 3.6.2 for some users
+- In case the login view still appears in expiration mode, the username field should be enabled, please log in again with your credentials
+- Fix some tweaks with iOS11 and optimised for iPhoneX 
+- FaceId support for iPhoneX, enable your passcode from Settings view
+- Replace app icon images with new Asset format 
+- Bug fixing and stability improvements
+
+## 3.7.1 (January 2018)
+- Fix a crash when opening the app after the upgrade for some users
+
+## 3.7.0 (December 2017)
+- OAuth2 support with automatically refresh of new tokens
+- New login view redesign
+- Improve the automatic parse of valid URL in login view
+- Automatic detection of authentication method available from the URL
+- Improve network error messages inside the login view and all the app
+- Improve UX for network warnings shown on the top of file list view
+- Improve accounts handling
+- Improve cookie sessions handling
+- Improve switching between accounts
+- Improve credentials handling in all requests and keychain
+- Upgrade new db version
+- New option in public share link that allows you to share a folder with only the option of uploading files to it
+- Reflect forbidden reshare server capability in app
+- Changes in Open-with feature to support whitelisted apps
+- Bug fixing
+- Please, notice that this will be the latest version with support for iOS 9 
+
 ## 3.6.2 (June 2017)
 - Support for private links
 - Fix crash in public share links on iPads with iOS10 

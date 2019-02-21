@@ -11,6 +11,7 @@
 #import "FileDto.h"
 #import "UtilsUrls.h"
 #import "InfoFileUtils.h"
+#import "constants.h"
 
 #define k_share_link_middle_part_url_before_version_8 @"public.php?service=files&t="
 #define k_share_link_middle_part_url_after_version_8 @"index.php/s/"
@@ -49,8 +50,7 @@
 
 + (NSURL *) getNormalizedURLOfShareLink:(OCSharedDto *)sharedLink {
     
-    
-    NSString *urlSharedLink = sharedLink.url ? sharedLink.url : sharedLink.token;
+    NSString *urlSharedLink = ([sharedLink.name length] == 0 || [sharedLink.url  isEqual: @"(null)"]) ? sharedLink.token : sharedLink.url;
     
     NSString *url = nil;
     // From ownCloud server 8.2 the url field is always set for public shares
@@ -63,11 +63,12 @@
         
         if (firstNumber.integerValue >= k_server_version_with_new_shared_schema) {
             // From ownCloud server version 8 on, a different share link scheme is used.
-            url = [NSString stringWithFormat:@"%@%@%@", APP_DELEGATE.activeUser.url, k_share_link_middle_part_url_after_version_8, sharedLink];
+            url = [NSString stringWithFormat:@"%@%@%@", APP_DELEGATE.activeUser.url, k_share_link_middle_part_url_after_version_8, urlSharedLink];
         }else{
-            url = [NSString stringWithFormat:@"%@%@%@", APP_DELEGATE.activeUser.url, k_share_link_middle_part_url_before_version_8, sharedLink];
+            url = [NSString stringWithFormat:@"%@%@%@", APP_DELEGATE.activeUser.url, k_share_link_middle_part_url_before_version_8, urlSharedLink];
         }
     }
+    DLog(@"the url for the public link is  %@",url);
     
     return  [NSURL URLWithString:url];
 }
@@ -89,10 +90,8 @@
 }
 
 + (BOOL) hasOptionShowFileListingToBeShownForFile:(FileDto *)file {
-   
-    AppDelegate *app = (AppDelegate *)[[UIApplication sharedApplication]delegate];
     
-    if ([self hasOptionAllowEditingToBeShownForFile:file] && app.activeUser.hasPublicShareLinkOptionUploadOnlySupport){
+    if ([self hasOptionAllowEditingToBeShownForFile:file] && APP_DELEGATE.activeUser.hasPublicShareLinkOptionUploadOnlySupport){
         return YES;
     }
     
@@ -157,6 +156,46 @@
         
         return YES;
     }
+    
+    return NO;
+}
+
++ (BOOL)isAllowedReshareForFile:(FileDto *)file {
+    
+    BOOL fileSharedWithMe = [file.permissions rangeOfString:k_permission_shared].location != NSNotFound ;
+    
+    if (APP_DELEGATE.activeUser.hasCapabilitiesSupport == serverFunctionalitySupported &&
+        APP_DELEGATE.activeUser.capabilitiesDto &&
+        !APP_DELEGATE.activeUser.capabilitiesDto.isFilesSharingReSharingEnabled &&
+        fileSharedWithMe) {
+        
+        return NO;
+    }
+    
+    return YES;
+}
+
++(BOOL)hasShareOptionToBeHidden {
+    
+    if ((k_hide_share_options) ||
+        (APP_DELEGATE.activeUser.hasCapabilitiesSupport == serverFunctionalitySupported &&
+         APP_DELEGATE.activeUser.capabilitiesDto &&
+         !APP_DELEGATE.activeUser.capabilitiesDto.isFilesSharingAPIEnabled)) {
+            return YES;
+        }
+    
+    return NO;
+}
+
++(BOOL)hasShareOptionToBeHiddenForFile:(FileDto *)file {
+    
+    if ((k_hide_share_options) ||
+        (APP_DELEGATE.activeUser.hasCapabilitiesSupport == serverFunctionalitySupported &&
+         APP_DELEGATE.activeUser.capabilitiesDto &&
+         (!APP_DELEGATE.activeUser.capabilitiesDto.isFilesSharingAPIEnabled ||
+          ![ShareUtils isAllowedReshareForFile:file]) )) {
+             return YES;
+         }
     
     return NO;
 }
@@ -302,20 +341,5 @@
     }
     
 }
-
-
-#pragma mark - private link
-
-+ (NSString *) getPrivateLinkOfFile:(FileDto *)fileDto {
-    
-    NSString *privateLink = @"";
-    
-    privateLink = [NSString stringWithFormat:@"%@%@%@", [UtilsUrls getFullRemoteServerPath:APP_DELEGATE.activeUser], k_pathPrivateLink, [InfoFileUtils getFileIdFromOcId:fileDto.ocId]];
-    
-    
-    return privateLink;
-    
-}
-
 
 @end

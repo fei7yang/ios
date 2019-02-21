@@ -46,6 +46,8 @@
 
 + (NSString *) getFullRemoteServerPath:(UserDto *)mUserDto;
 
++ (NSString *) getFullRemoteServerPathWithWebDavByNormalizedUrl:(NSString *)url;
+
 + (NSString *) getRemoteServerPathWithoutFolders:(UserDto *)mUser;
 
 + (NSString *) getFullRemoteServerPathWithWebDav:(UserDto *)mUserDto;
@@ -109,6 +111,26 @@
 
 + (BOOL) isNecessaryUpdateToPredefinedUrlByPreviousUrl:(NSString *)oldPredefinedUrl;
 
-+ (NSString *) getFullRemoteServerPathWithoutProtocolBeginningWithUsername:(UserDto *)mUserDto;
++ (NSString *) getFullRemoteServerPathWithoutProtocolBeginningWithUserDisplayName:(UserDto *)mUserDto;
+
+
+
+
+/**
+ Extract file path arguments from a web link.
+ It receives a link like http://domain/sub1/sub2/apps/files/?dir=/Documents/2/3/4/5/6
+ and returns Documents/2/3/4/5/6
+
+ @param filePath Web link of a file in a format http://domain/sub1/sub2/apps/files/?dir=/Documents/2/3/4/5/6
+ @param mUserDto Current user logged in the app
+ @return File path
+ */
++ (NSString *) getSharedLinkArgumentsFromWebLink:(NSString *)filePath andUser:(UserDto *)mUserDto;
+
++(NSArray<NSString *> *) getArrayOfWebdavUrlWithUrlInWebScheme: (NSString *)UrlInWebScheme forUser:(UserDto *)user isDirectory: (BOOL) isDirectory;
+
++(NSString *) getServerSubfolders:(UserDto *)mUser;
+
++ (NSString *) removeUnnecessaryParts:(NSString *)filePath;
 
 @end

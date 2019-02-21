@@ -38,20 +38,8 @@
 	</array>
 	<key>CFBundleExecutable</key>
 	<string>${EXECUTABLE_NAME}</string>
-	<key>CFBundleIconFiles</key>
-	<array>
-		<string>MainAppIcon_40-40.png</string>
-		<string>MainAppIcon_40-40@2x.png</string>
-		<string>MainAppIcon_40-40@3x.png</string>
-		<string>MainAppIcon_29-29.png</string>
-		<string>MainAppIcon_29-29@2x.png</string>
-		<string>MainAppIcon_29-29@3x.png</string>
-		<string>MainAppIcon_60-60@2x.png</string>
-		<string>MainAppIcon_60-60@3x.png</string>
-		<string>MainAppIcon_76-76.png</string>
-		<string>MainAppIcon_76-76@2x.png</string>
-		<string>MainAppIcon_167-167.png</string>
-	</array>
+	<key>CFBundleIconName</key>
+	<string>MainAppIcon</string>
 	<key>CFBundleIdentifier</key>
 	<string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
 	<key>CFBundleInfoDictionaryVersion</key>
@@ -61,7 +49,7 @@
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
-	<string>3.6.2</string>
+	<string>3.8.0</string>
 	<key>CFBundleSignature</key>
 	<string>????</string>
 	<key>CFBundleURLTypes</key>
@@ -94,6 +82,18 @@
 		<key>NSExceptionDomains</key>
 		<dict/>
 	</dict>
+	<key>NSFaceIDUsageDescription</key>
+	<string>Used to allow you unlock your app with your face</string>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>Used to instantly upload your new photos after a significant change in your location</string>
+	<key>NSLocationAlwaysUsageDescription</key>
+	<string>Used to instantly upload your new photos after a significant change in your location</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Used to instantly upload your new photos after a significant change in your location</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>Used to save your selected photo to your camera roll</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Used to upload your selected photos to your account</string>
 	<key>UIApplicationExitsOnSuspend</key>
 	<false/>
 	<key>UIBackgroundModes</key>
@@ -140,11 +140,5 @@
 	</array>
 	<key>UIViewControllerBasedStatusBarAppearance</key>
 	<true/>
-	<key>NSPhotoLibraryUsageDescription</key>
-	<string>Upload your selected photos to your account</string>
-	<key>NSLocationAlwaysUsageDescription</key>
-	<string>Used to instantly upload your new photos after a significant change in your location</string>
-	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>Used to instantly upload your new photos after a significant change in your location</string>
 </dict>
 </plist>

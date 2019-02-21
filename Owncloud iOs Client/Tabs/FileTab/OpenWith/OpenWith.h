@@ -37,7 +37,6 @@
 @property(nonatomic,weak) __weak id<OpenWithDelegate> delegate; 
 @property(nonatomic, strong) UIView *parentView;
 @property(nonatomic, strong) UIDocumentInteractionController *documentInteractionController;
-
 @property(nonatomic, strong) UIBarButtonItem *parentButton;
 @property(nonatomic, strong) Download *download;
 @property(nonatomic, strong) NSString *currentLocalFolder;

@@ -30,6 +30,10 @@
 #pragma mark - capabilities checks
 
 + (BOOL) isPasswordEnforcedCapabilityEnabled;
++ (BOOL) isAllowedReshareForFile:(FileDto *)file;
+
++ (BOOL) hasShareOptionToBeHidden;
++ (BOOL) hasShareOptionToBeHiddenForFile:(FileDto *)file;
 
 + (BOOL) hasOptionAllowEditingToBeShownForFile:(FileDto *)file;
 + (BOOL) hasOptionShowFileListingToBeShownForFile:(FileDto *)file;
@@ -57,8 +61,5 @@
 #pragma mark - display utils
 
 + (NSString *) getDisplayNameForSharee:(OCShareUser *)sharee;
-
-
-+ (NSString *) getPrivateLinkOfFile:(FileDto *)fileDto;
 
 @end

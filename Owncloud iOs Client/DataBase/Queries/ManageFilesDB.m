@@ -36,13 +36,9 @@
 
 @implementation ManageFilesDB
 
-/*
- * Method that give all files from a single folder
- * @fileId -> id of the folder father and we want all his files and folders
- */
+
 + (NSMutableArray *) getFilesByFileIdForActiveUser:(NSInteger) fileId {
 
-    
     UserDto *mUser;
     
 #ifdef CONTAINER_APP
@@ -53,12 +49,12 @@
 #endif
     __block NSMutableArray *output = [NSMutableArray new];
 
-    DLog(@"getFilesByFileId: %ld",(long)fileId);
+    DLog(@"getFilesByFileId: %ld for active user %ld, %@",(long)fileId, mUser.userId, mUser.username);
 
     FMDatabaseQueue *queue = Managers.sharedDatabase;
     
     [queue inDatabase:^(FMDatabase *db) {
-        FMResultSet *rs = [db executeQuery:@"SELECT * FROM files WHERE file_id = ? AND user_id = ? ORDER BY file_name ASC", [NSNumber numberWithInteger:fileId], [NSNumber numberWithInteger:mUser.idUser]];
+        FMResultSet *rs = [db executeQuery:@"SELECT * FROM files WHERE file_id = ? AND user_id = ? ORDER BY file_name ASC", [NSNumber numberWithInteger:fileId], [NSNumber numberWithInteger:mUser.userId]];
         while ([rs next]) {
             
             FileDto *currentFile = [[FileDto alloc] init];
@@ -81,6 +77,7 @@
             currentFile.permissions = [rs stringForColumn:@"permissions"];
             currentFile.taskIdentifier = [rs intForColumn:@"task_identifier"];
             currentFile.providingFileId = [rs intForColumn:@"providing_file_id"];
+            currentFile.ocPrivatelink = [rs stringForColumn:@"oc_privatelink"];
             
             [output addObject:currentFile];
         }
@@ -90,10 +87,7 @@
     return output;
 }
 
-/*
- * Method that give all folders from a single folder
- * @fileId -> id of the folder father and we want all his files and folders
- */
+
 + (NSMutableArray *) getFoldersByFileIdForActiveUser:(NSInteger) fileId {
     
     UserDto *mUser;
@@ -111,7 +105,7 @@
     
     [queue inDatabase:^(FMDatabase *db) {
 
-        FMResultSet *rs = [db executeQuery:@"SELECT * FROM files WHERE file_id = ? AND is_directory = 1 AND user_id = ? ORDER BY file_name ASC", [NSNumber numberWithInteger:fileId], [NSNumber numberWithInteger:mUser.idUser]];
+        FMResultSet *rs = [db executeQuery:@"SELECT * FROM files WHERE file_id = ? AND is_directory = 1 AND user_id = ? ORDER BY file_name ASC", [NSNumber numberWithInteger:fileId], [NSNumber numberWithInteger:mUser.userId]];
 
         while ([rs next]) {
             
@@ -135,6 +129,7 @@
             currentFile.permissions = [rs stringForColumn:@"permissions"];
             currentFile.taskIdentifier = [rs intForColumn:@"task_identifier"];
             currentFile.providingFileId = [rs intForColumn:@"providing_file_id"];
+            currentFile.ocPrivatelink = [rs stringForColumn:@"oc_privatelink"];
             
             [output addObject:currentFile];
         }
@@ -144,19 +139,7 @@
     return output;
 }
 
-///-----------------------------------
-/// @name Get Files by idFile
-///-----------------------------------
 
-/**
- * Method that return an array of files, this files are sons of fileId
- *
- * @param fileId -> NSInteger
- *
- * @return list of files -> NSMutableArray
- *
- * @warning For filePath and localFolder is necessary the user, but we call this method before to check the user
- */
 + (NSMutableArray *) getFilesByFileId:(NSInteger) fileId {
     
     __block NSMutableArray *output = [NSMutableArray new];
@@ -189,6 +172,7 @@
             currentFile.permissions = [rs stringForColumn:@"permissions"];
             currentFile.taskIdentifier = [rs intForColumn:@"task_identifier"];
             currentFile.providingFileId = [rs intForColumn:@"providing_file_id"];
+            currentFile.ocPrivatelink = [rs stringForColumn:@"oc_privatelink"];
             
             [output addObject:currentFile];
         }
@@ -211,7 +195,7 @@
     
     [queue inDatabase:^(FMDatabase *db) {
 
-        FMResultSet *rs = [db executeQuery:@"SELECT * FROM files WHERE id = ? AND user_id = ? ORDER BY file_name ASC", [NSNumber numberWithInteger:idFile], [NSNumber numberWithInteger:mUser.idUser]];
+        FMResultSet *rs = [db executeQuery:@"SELECT * FROM files WHERE id = ? AND user_id = ? ORDER BY file_name ASC", [NSNumber numberWithInteger:idFile], [NSNumber numberWithInteger:mUser.userId]];
 
         while ([rs next]) {
             
@@ -236,12 +220,14 @@
             output.permissions = [rs stringForColumn:@"permissions"];
             output.taskIdentifier = [rs intForColumn:@"task_identifier"];
             output.providingFileId = [rs intForColumn:@"providing_file_id"];
+            output.ocPrivatelink = [rs stringForColumn:@"oc_privatelink"];
         }
         [rs close];
     }];
     
     return output;
 }
+
 
 +(FileDto *) getFileDtoByFileName:(NSString *) fileName andFilePath:(NSString *) filePath andUser:(UserDto *) user {
     
@@ -250,7 +236,7 @@
     FMDatabaseQueue *queue = Managers.sharedDatabase;
     
     [queue inDatabase:^(FMDatabase *db) {
-        FMResultSet *rs = [db executeQuery:@"SELECT * FROM files WHERE file_name = ? AND file_path= ? AND user_id = ? ORDER BY file_name ASC",fileName, filePath, [NSNumber numberWithInteger:user.idUser]];
+        FMResultSet *rs = [db executeQuery:@"SELECT * FROM files WHERE file_name = ? AND file_path= ? AND user_id = ? ORDER BY file_name ASC",fileName, filePath, [NSNumber numberWithInteger:user.userId]];
         
         while ([rs next]) {
             
@@ -275,6 +261,7 @@
             output.permissions = [rs stringForColumn:@"permissions"];
             output.taskIdentifier = [rs intForColumn:@"task_identifier"];
             output.providingFileId = [rs intForColumn:@"providing_file_id"];
+            output.ocPrivatelink = [rs stringForColumn:@"oc_privatelink"];
     
         }
         [rs close];
@@ -282,6 +269,7 @@
     
     return output;
 }
+
 
 +(NSMutableArray *) getAllFoldersByBeginFilePath:(NSString *) beginFilePath {
     
@@ -304,7 +292,7 @@
     FMDatabaseQueue *queue = Managers.sharedDatabase;
     
     [queue inDatabase:^(FMDatabase *db) {
-        FMResultSet *rs = [db executeQuery:@"SELECT DISTINCT file_path, file_name, id FROM files WHERE user_id = ? AND file_path LIKE ? ORDER BY file_name ASC", [NSNumber numberWithInteger:mUser.idUser], beginFilePath];
+        FMResultSet *rs = [db executeQuery:@"SELECT DISTINCT file_path, file_name, id FROM files WHERE user_id = ? AND file_path LIKE ? ORDER BY file_name ASC", [NSNumber numberWithInteger:mUser.userId], beginFilePath];
         while ([rs next]) {
             
             FileDto *currentFile = [FileDto new];
@@ -321,9 +309,53 @@
     return output;
 }
 
++(FileDto *)getFileDtoByOCid:(NSString *) ocFileId {
+    __block FileDto *output = nil;
+
+    UserDto *mUser = [ManageUsersDB getActiveUser];
+
+    DLog(@"getFileDtoByOCid: %@", ocFileId);
+
+    FMDatabaseQueue *queue = Managers.sharedDatabase;
+
+    [queue inDatabase:^(FMDatabase *db) {
+
+        FMResultSet *rs = [db executeQuery:@"SELECT * FROM files WHERE oc_id = ?", ocFileId];
+
+        while ([rs next]) {
+
+            output = [FileDto new];
+
+            output.idFile = [rs intForColumn:@"id"];
+            output.ocId = [rs stringForColumn:@"oc_id"];
+            output.filePath = [NSString stringWithFormat:@"%@%@",[UtilsUrls getRemovedPartOfFilePathAnd:mUser],[rs stringForColumn:@"file_path"]];
+            output.fileName = [rs stringForColumn:@"file_name"];
+            output.isDirectory = [rs intForColumn:@"is_directory"];
+            output.userId = [rs intForColumn:@"user_id"];
+            output.isDownload = [rs intForColumn:@"is_download"];
+            output.size = [rs longForColumn:@"size"];
+            output.fileId = [rs intForColumn:@"file_id"];
+            output.date = [rs longForColumn:@"date"];
+            output.isFavorite = [rs intForColumn:@"is_favorite"];
+            output.localFolder = [UtilsUrls getLocalFolderByFilePath:output.filePath andFileName:output.fileName andUserDto:mUser];
+            output.etag = [rs stringForColumn:@"etag"];
+            output.isRootFolder = [rs intForColumn:@"is_root_folder"];
+            output.isNecessaryUpdate = [rs intForColumn:@"is_necessary_update"];
+            output.sharedFileSource = [rs intForColumn:@"shared_file_source"];
+            output.permissions = [rs stringForColumn:@"permissions"];
+            output.taskIdentifier = [rs intForColumn:@"task_identifier"];
+            output.providingFileId = [rs intForColumn:@"providing_file_id"];
+            output.ocPrivatelink = [rs stringForColumn:@"oc_privatelink"];
+        }
+        [rs close];
+    }];
+
+    return output;
+}
+
 +(void) setFileIsDownloadState: (NSInteger) idFile andState:(enumDownload)downloadState {
     
-    DLog(@"setFileIsDownloadState");
+    DLog(@"_setFileIsDownloadState id =%ld",(long)idFile);
     FMDatabaseQueue *queue = Managers.sharedDatabase;
     
     [queue inTransaction:^(FMDatabase *db, BOOL *rollback) {
@@ -332,7 +364,7 @@
         correctQuery = [db executeUpdate:@"UPDATE files SET is_download=? WHERE id = ?", [NSNumber numberWithInt:downloadState], [NSNumber numberWithInteger:idFile]];
         
         if (!correctQuery) {
-            DLog(@"Error in setFileIsDownloadState");
+            DLog(@"Error in setFileIsDownloadState id =%ld",(long)idFile);
         }
         
     }];
@@ -347,7 +379,7 @@
     [queue inTransaction:^(FMDatabase *db, BOOL *rollback) {
         BOOL correctQuery=NO;
         
-        correctQuery = [db executeUpdate:@"UPDATE files SET is_download=? WHERE file_path = ? AND file_name=? AND user_id = ?", [NSNumber numberWithInt:downloadState], filePath, fileName, [NSNumber numberWithInteger:aciveUser.idUser]];
+        correctQuery = [db executeUpdate:@"UPDATE files SET is_download=? WHERE file_path = ? AND file_name=? AND user_id = ?", [NSNumber numberWithInt:downloadState], filePath, fileName, [NSNumber numberWithInteger:aciveUser.userId]];
         
         if (!correctQuery) {
             DLog(@"Error in setFileIsDownloadState");
@@ -355,6 +387,7 @@
         
     }];
 }
+
 
 +(void) setFilePath: (NSString * ) filePath byIdFile: (NSInteger) idFile {
     
@@ -373,19 +406,11 @@
     }];
 }
 
-+(void) insertManyFiles:(NSMutableArray *)listOfFiles andFileId:(NSInteger)fileId {
+
++(void) insertManyFiles:(NSArray *)listOfFiles ofFileId:(NSInteger)fileId andUser:(UserDto *)user {
     
     NSString *sql = @"";
     NSMutableArray *arrayOfSqlRequests = [NSMutableArray new];
-    
-    UserDto *mUser;
-    
-#ifdef CONTAINER_APP
-    AppDelegate *app = (AppDelegate *)[[UIApplication sharedApplication] delegate];
-    mUser = app.activeUser;
-#else
-    mUser = [ManageUsersDB getActiveUser];
-#endif
     
     NSInteger numberOfInsertEachTime = 0;
     
@@ -397,11 +422,11 @@
                //INSERT INTO files(file_path, file_name, is_directory,user_id, is_download, size, file_id, date
                FileDto *current = [listOfFiles objectAtIndex:i];
                current.fileId = fileId;
-               current.userId = mUser.idUser;
+               current.userId = user.userId;
                 
                 //to jump the first becouse it is not necesary (is the same directory) and the other if is to insert 450 by 450
                 if(numberOfInsertEachTime == 0) {
-                    sql = [NSString stringWithFormat:@"INSERT INTO files SELECT null as id, '%@' as 'file_path','%@' as 'file_name', %ld as 'user_id', %d as 'is_directory',%ld as 'is_download', %ld as 'file_id', %@ as 'size', %@ as 'date', %d as 'is_favorite','%@' as 'etag', %d as 'is_root_folder', %d as 'is_necessary_update', %ld as 'shared_file_source', '%@' as 'permissions', %ld as 'task_identifier', %ld as 'providing_file_id', '%@' as 'oc_id'",
+                    sql = [NSString stringWithFormat:@"INSERT INTO files SELECT null as id, '%@' as 'file_path','%@' as 'file_name', %ld as 'user_id', %d as 'is_directory',%ld as 'is_download', %ld as 'file_id', %@ as 'size', %@ as 'date', %d as 'is_favorite','%@' as 'etag', %d as 'is_root_folder', %d as 'is_necessary_update', %ld as 'shared_file_source', '%@' as 'permissions', %ld as 'task_identifier', %ld as 'providing_file_id', '%@' as 'oc_id', '%@' as 'oc_privatelink'",
                            current.filePath,
                            current.fileName,
                            (long)current.userId,
@@ -418,11 +443,12 @@
                            current.permissions,
                            (long)current.taskIdentifier,
                            (long)current.providingFileId,
-                           current.ocId];
+                           current.ocId,
+                           current.ocPrivatelink];
 
                     //DLog(@"sql!!!: %@", sql);
                 } else {
-                    sql = [NSString stringWithFormat:@"%@ UNION SELECT null, '%@','%@',%ld,%d,%ld,%ld,%@,%@,%d,'%@',%d,%d,%ld,'%@',%ld,%ld,'%@'",
+                    sql = [NSString stringWithFormat:@"%@ UNION SELECT null, '%@','%@',%ld,%d,%ld,%ld,%@,%@,%d,'%@',%d,%d,%ld,'%@',%ld,%ld,'%@','%@'",
                            sql,
                            current.filePath,
                            current.fileName,
@@ -440,7 +466,8 @@
                            current.permissions,
                            (long)current.taskIdentifier,
                            (long)current.providingFileId,
-                           current.ocId];
+                           current.ocId,
+                           current.ocPrivatelink];
 
                 }
                 
@@ -471,11 +498,12 @@
             }
             
             if (!correctQuery) {
-                DLog(@"Error in insertManyFiles");
+                DLog(@"Error inserting %lu files in DB for file directory id=%ld of user %@", (unsigned long)[listOfFiles count],  (long)fileId, user.username);
+            } else {
+                DLog(@"Inserted %lu files in DB for file directory id=%ld", (unsigned long)[listOfFiles count], (long)fileId);
             }
             
         }];
-        
     }
 }
 
@@ -496,7 +524,7 @@
     [queue inTransaction:^(FMDatabase *db, BOOL *rollback) {
         BOOL correctQuery=NO;
         
-        correctQuery = [db executeUpdate:@"DELETE FROM files WHERE id = ? AND user_id = ?",[NSNumber numberWithInteger:idFile], [NSNumber numberWithInteger:mUser.idUser]];
+        correctQuery = [db executeUpdate:@"DELETE FROM files WHERE id = ? AND user_id = ?",[NSNumber numberWithInteger:idFile], [NSNumber numberWithInteger:mUser.userId]];
         
         if (!correctQuery) {
             DLog(@"Error in deleteFileByIdFile");
@@ -505,15 +533,7 @@
     }];
 }
 
-///-----------------------------------
-/// @name Delete File by idfile
-///-----------------------------------
 
-/**
- * Method that delete a file/folder of the database
- *
- * @param idFile -> NSInteger (Item to delete)
- */
 +(void) deleteFileByIdFile:(NSInteger) idFile {
     
     FMDatabaseQueue *queue = Managers.sharedDatabase;
@@ -529,6 +549,7 @@
         
     }];
 }
+
 
 +(void) deleteFilesFromDBBeforeRefreshByFileId: (NSInteger) fileId {
     
@@ -548,7 +569,7 @@
     [queue inTransaction:^(FMDatabase *db, BOOL *rollback) {
         BOOL correctQuery=NO;
         
-        correctQuery = [db executeUpdate:@"DELETE FROM files WHERE file_id = ? AND user_id = ?", [NSNumber numberWithInteger:fileId], [NSNumber numberWithInteger:mUser.idUser]];
+        correctQuery = [db executeUpdate:@"DELETE FROM files WHERE file_id = ? AND user_id = ?", [NSNumber numberWithInteger:fileId], [NSNumber numberWithInteger:mUser.userId]];
         
         if (!correctQuery) {
             DLog(@"Error in deleteFilesFromDBBeforeRefreshByFileId");
@@ -556,6 +577,7 @@
         
     }];
 }
+
 
 + (void) backupOfTheProcessingFilesAndFoldersByFileId:(NSInteger) fileId {
     
@@ -573,7 +595,7 @@
     [queue inTransaction:^(FMDatabase *db, BOOL *rollback) {
         BOOL correctQuery=NO;
         
-        correctQuery = [db executeUpdate:@"INSERT INTO files_backup SELECT * FROM files WHERE user_id =? and file_id=?", [NSNumber numberWithInteger:mUser.idUser], [NSNumber numberWithInteger:fileId]];
+        correctQuery = [db executeUpdate:@"INSERT INTO files_backup SELECT * FROM files WHERE user_id =? and file_id=?", [NSNumber numberWithInteger:mUser.userId], [NSNumber numberWithInteger:fileId]];
         
         if (!correctQuery) {
             DLog(@"Error in backupFoldersDownloadedFavoritesByFileId");
@@ -597,7 +619,7 @@
     FMDatabaseQueue *queue = Managers.sharedDatabase;
     
     [queue inDatabase:^(FMDatabase *db) {
-        FMResultSet *rs = [db executeQuery:@"SELECT files.id, back.file_id, back.etag, back.is_favorite FROM files, (SELECT DISTINCT files.file_id, files_backup.file_path, files_backup.file_name, files_backup.etag, files_backup.is_favorite FROM files_backup, files WHERE files.file_id = files_backup.id AND files_backup.is_directory = 1) back WHERE user_id = ? AND files.file_path = back.file_path AND files.file_name = back.file_name ORDER BY id DESC", [NSNumber numberWithInteger:mUser.idUser]];
+        FMResultSet *rs = [db executeQuery:@"SELECT files.id, back.file_id, back.etag, back.is_favorite FROM files, (SELECT DISTINCT files.file_id, files_backup.file_path, files_backup.file_name, files_backup.etag, files_backup.is_favorite FROM files_backup, files WHERE files.file_id = files_backup.id AND files_backup.is_directory = 1) back WHERE user_id = ? AND files.file_path = back.file_path AND files.file_name = back.file_name ORDER BY id DESC", [NSNumber numberWithInteger:mUser.userId]];
         while ([rs next]) {
             
             FileDto *currentFile = [[FileDto alloc] init];
@@ -635,19 +657,6 @@
 }
 
 
-///-----------------------------------
-/// @name updateFilesFromBackup
-///-----------------------------------
-
-/**
- * This method update the files DB with the datas located on the files_backup DB
- * 
- * If the file is overwritten we update the fileds: is_download, shared_file_source and
- * is_overwritten
- *
- * If other case we update the fields: is_download, shared_file_source and is_overwritten
- * AND etag
- */
 +(void) updateFilesFromBackup {
     
     //1 - Select the files from the files_backup DB that want to be updated on the files DB
@@ -656,8 +665,10 @@
     FMDatabaseQueue *queue = Managers.sharedDatabase;
     
     [queue inDatabase:^(FMDatabase *db) {
-        FMResultSet *rs = [db executeQuery:@"SELECT f.id, f.user_id, b.etag, b.is_necessary_update, b.is_download, b.shared_file_source, b.permissions, b.task_identifier, b.providing_file_id FROM files f, (SELECT id, user_id, file_path, file_name, etag, is_necessary_update, is_download, shared_file_source, permissions, task_identifier, providing_file_id FROM files_backup WHERE (files_backup.is_download != 0 or files_backup.shared_file_source != 0 or files_backup.providing_file_id != 0)) b WHERE b.file_path = f.file_path AND b.file_name = f.file_name AND b.user_id = f.user_id"];
+        FMResultSet *rs = [db executeQuery:@"SELECT f.id as 'f.id', f.user_id as 'f.user_id', b.etag as 'b.etag', b.is_necessary_update as 'b.is_necessary_update', b.is_download as 'b.is_download', b.shared_file_source as 'b.shared_file_source', b.permissions as 'b.permissions', b.task_identifier as 'b.task_identifier', b.providing_file_id as 'b.providing_file_id' FROM files f, (SELECT id, user_id, file_path, file_name, etag, is_necessary_update, is_download, shared_file_source, permissions, task_identifier, providing_file_id FROM files_backup WHERE (files_backup.is_download != 0 or files_backup.shared_file_source != 0 or files_backup.providing_file_id != 0)) b WHERE b.file_path = f.file_path AND b.file_name = f.file_name AND b.user_id = f.user_id"];
         while ([rs next]) {
+
+			DLog(@"Columns: %@", [rs resultDictionary]);
             
             FileDto *currentFile = [[FileDto alloc] init];
             currentFile.idFile = [rs intForColumn:@"f.id"];
@@ -698,18 +709,7 @@
     }];
 }
 
-///-----------------------------------
-/// @name setUpdateIsNecessaryFromBackup
-///-----------------------------------
 
-/**
- * This method set the field isNecessaryUpdate to YES on the files DB when the file stored etag 
- * on the files DB is diferent that the one stored on the files_backup DB
- * The only exception is that the field is not set to YES is the file is overwritten, in this
- * case the etag must be updated on the files DB: check the method updateFilesFromBackup
- *
- * @param idFile -> NSInteger, the file that want to update
- */
 +(void) setUpdateIsNecessaryFromBackup:(NSInteger) idFile {
     
     //1-Select the files from the files_backup DB
@@ -775,15 +775,6 @@
 }
 
 
-///-----------------------------------
-/// @name setIsNecessaryUpdateOfTheFile
-///-----------------------------------
-
-/**
- * This method updates the is_necessary_update field of the file
- *
- * @param idFile -> int
- */
 + (void) setIsNecessaryUpdateOfTheFile: (NSInteger) idFile {
     DLog(@"setIsNecessaryUpdateOfTheFile");
     FMDatabaseQueue *queue = Managers.sharedDatabase;
@@ -800,18 +791,6 @@
 }
 
 
-///-----------------------------------
-/// @name Delete OffSpring of this Folder
-///-----------------------------------
-
-/**
- *
- * Recursive method to delete the offspring of a specific folder.
- * This is neccesary when in the server array after a proffind process
- * the folder does not appear.
- *
- * @param folder -> FileDto
- */
 + (void) deleteOffspringOfThisFolder:(FileDto *)folder{
     
     //Get Files of the Folder
@@ -850,7 +829,7 @@
     FMDatabaseQueue *queue = Managers.sharedDatabase;
     
     [queue inDatabase:^(FMDatabase *db) {
-        FMResultSet *rs = [db executeQuery:@"SELECT files_backup.id, files_backup.file_path, files_backup.file_name, files_backup.is_directory FROM files_backup WHERE files_backup.id NOT IN (SELECT back.id FROM (SELECT id, file_path, file_name FROM files_backup) back, (SELECT id, file_path, file_name FROM files WHERE user_id = ?) files WHERE files.file_path = back.file_path AND files.file_name = back.file_name)", [NSNumber numberWithInteger:mUser.idUser]];
+        FMResultSet *rs = [db executeQuery:@"SELECT files_backup.id, files_backup.file_path, files_backup.file_name, files_backup.is_directory FROM files_backup WHERE files_backup.id NOT IN (SELECT back.id FROM (SELECT id, file_path, file_name FROM files_backup) back, (SELECT id, file_path, file_name FROM files WHERE user_id = ?) files WHERE files.file_path = back.file_path AND files.file_name = back.file_name)", [NSNumber numberWithInteger:mUser.userId]];
         while ([rs next]) {
             
             FileDto *currentFile = [[FileDto alloc] init];
@@ -895,6 +874,7 @@
     }
 }
 
+
 +(void) deleteAllThumbnailsWithDifferentEtagFromBackup {
     
     DLog(@"deleteAllThumbnailsWithDifferentEtagFromBackup");
@@ -931,7 +911,7 @@
     FMDatabaseQueue *queue = Managers.sharedDatabase;
     
     [queue inDatabase:^(FMDatabase *db) {
-        FMResultSet *rs = [db executeQuery:@"SELECT f.id FROM files f, (SELECT id, file_path, user_id, file_name FROM files_backup WHERE files_backup.is_favorite = 1) b WHERE b.file_path = f.file_path AND b.file_name=f.file_name AND f.user_id = b.user_id"];
+        FMResultSet *rs = [db executeQuery:@"SELECT f.id as 'f.id' FROM files f, (SELECT id, file_path, user_id, file_name FROM files_backup WHERE files_backup.is_favorite = 1) b WHERE b.file_path = f.file_path AND b.file_name=f.file_name AND f.user_id = b.user_id"];
         
         while ([rs next]) {
                         
@@ -959,6 +939,7 @@
     }];
 }
 
+
 + (void) deleteFilesBackup {
     
     FMDatabaseQueue *queue = Managers.sharedDatabase;
@@ -975,6 +956,7 @@
     }];
 }
 
+
 +(void) renameFileByFileDto:(FileDto *) file andNewName:(NSString *) mNewName {
     
     FMDatabaseQueue *queue = Managers.sharedDatabase;
@@ -990,6 +972,7 @@
         
     }];
 }
+
 
 +(void) renameFolderByFileDto:(FileDto *) file andNewName:(NSString *) mNewName {
     
@@ -1008,6 +991,7 @@
         
     }];
 }
+
 
 +(BOOL) isFileOnDataBase: (FileDto *)fileDto {
     
@@ -1033,6 +1017,7 @@
     return output;
 }
 
+
 +(void) deleteFileByFilePath: (NSString *) filePathToDelete andFileName: (NSString*)fileName {
     
     DLog(@"deleteFileByFilePath: %@ filePathToDelete andFileName: %@", filePathToDelete, fileName);
@@ -1051,13 +1036,14 @@
     [queue inTransaction:^(FMDatabase *db, BOOL *rollback) {
         BOOL correctQuery=NO;
         
-        correctQuery = [db executeUpdate:@"DELETE FROM files WHERE file_path = ? AND file_name = ? AND user_id = ?",filePathToDelete, fileName, [NSNumber numberWithInteger:mUser.idUser]];
+        correctQuery = [db executeUpdate:@"DELETE FROM files WHERE file_path = ? AND file_name = ? AND user_id = ?",filePathToDelete, fileName, [NSNumber numberWithInteger:mUser.userId]];
         
         if (!correctQuery) {
             DLog(@"Error in deleteFileByFilePath");
         }
     }];
 }
+
 
 +(FileDto *) getFolderByFilePath: (NSString *) newFilePath andFileName: (NSString *) fileName {
 
@@ -1075,7 +1061,7 @@
     FMDatabaseQueue *queue = Managers.sharedDatabase;
     
     [queue inDatabase:^(FMDatabase *db) {
-        FMResultSet *rs = [db executeQuery:@"SELECT * FROM files WHERE file_path = ? AND file_name = ? AND user_id = ? AND is_directory = 1 ORDER BY file_name ASC", newFilePath, fileName, [NSNumber numberWithInteger:mUser.idUser]];
+        FMResultSet *rs = [db executeQuery:@"SELECT * FROM files WHERE file_path = ? AND file_name = ? AND user_id = ? AND is_directory = 1 ORDER BY file_name ASC", newFilePath, fileName, [NSNumber numberWithInteger:mUser.userId]];
                 
         while ([rs next]) {
             
@@ -1092,6 +1078,7 @@
             output.fileId = [rs intForColumn:@"file_id"];
             output.date = [rs longForColumn:@"date"];
             output.isFavorite = [rs intForColumn:@"is_favorite"];
+            output.ocPrivatelink = [rs stringForColumn:@"oc_privatelink"];
             output.localFolder = [UtilsUrls getLocalFolderByFilePath:output.filePath andFileName:output.fileName andUserDto:mUser];
             
         }
@@ -1100,6 +1087,7 @@
     
     return output;
 }
+
 
 + (void) updateFolderOfFileDtoByNewFilePath:(NSString *) newFilePath andDestinationFileDto:(FileDto *) folderDto andNewFileName:(NSString *)changedFileName andFileDto:(FileDto *) selectedFile {
     
@@ -1117,6 +1105,7 @@
     }];
 }
 
+
 +(void) updatePath:(NSString *) oldFilePath withNew:(NSString *) newFilePath andFileId:(NSInteger) fileId andSelectedFileId:(NSInteger) selectedFileId andChangedFileName:(NSString *) fileName {
     
     UserDto *mUser;
@@ -1133,7 +1122,7 @@
     [queue inTransaction:^(FMDatabase *db, BOOL *rollback) {
         BOOL correctQuery=NO;
         
-        correctQuery = [db executeUpdate:@"UPDATE files SET file_path=?, file_id=?, file_name=? WHERE user_id = ? AND id = ?", newFilePath, [NSNumber numberWithInteger:fileId], fileName, [NSNumber numberWithInteger:mUser.idUser], [NSNumber numberWithInteger:selectedFileId]];
+        correctQuery = [db executeUpdate:@"UPDATE files SET file_path=?, file_id=?, file_name=? WHERE user_id = ? AND id = ?", newFilePath, [NSNumber numberWithInteger:fileId], fileName, [NSNumber numberWithInteger:mUser.userId], [NSNumber numberWithInteger:selectedFileId]];
                 
         if (!correctQuery) {
             DLog(@"Error in updateFolderOfFileDtoByNewFilePath");
@@ -1141,6 +1130,7 @@
         
     }];
 }
+
 
 +(void) updatePathwithNewPath:(NSString *) newFilePath andFileDto:(FileDto *) selectedFile {
     
@@ -1158,7 +1148,7 @@
     [queue inTransaction:^(FMDatabase *db, BOOL *rollback) {
         BOOL correctQuery=NO;
         
-        correctQuery = [db executeUpdate:@"UPDATE files SET file_path=? WHERE user_id = ? AND id=?", newFilePath, [NSNumber numberWithInteger:mUser.idUser], [NSNumber numberWithInteger:selectedFile.idFile]];
+        correctQuery = [db executeUpdate:@"UPDATE files SET file_path=? WHERE user_id = ? AND id=?", newFilePath, [NSNumber numberWithInteger:mUser.userId], [NSNumber numberWithInteger:selectedFile.idFile]];
         
         if (!correctQuery) {
             DLog(@"Error in updatePathwithNewPath");
@@ -1166,6 +1156,7 @@
         
     }];
 }
+
 
 +(BOOL) isExistRootFolderByUser:(UserDto *) currentUser {
     
@@ -1177,7 +1168,7 @@
     FMDatabaseQueue *queue = Managers.sharedDatabase;
     
     [queue inDatabase:^(FMDatabase *db) {
-        FMResultSet *rs = [db executeQuery:@"SELECT COUNT(*) AS NUM FROM files WHERE user_id = ? AND is_root_folder = 1", [NSNumber numberWithInteger:currentUser.idUser]];
+        FMResultSet *rs = [db executeQuery:@"SELECT COUNT(*) AS NUM FROM files WHERE user_id = ? AND is_root_folder = 1", [NSNumber numberWithInteger:currentUser.userId]];
         while ([rs next]) {
             size = [rs intForColumn:@"NUM"];
         }
@@ -1190,6 +1181,7 @@
     
     return output;
 }
+
 
 +(void) insertFile:(FileDto *)fileDto {
     
@@ -1206,6 +1198,7 @@
     }];
 }
 
+
 +(FileDto *) getRootFileDtoByUser:(UserDto *) currentUser {
     
     __block FileDto *output = nil;
@@ -1213,7 +1206,7 @@
     FMDatabaseQueue *queue = Managers.sharedDatabase;
     
     [queue inDatabase:^(FMDatabase *db) {
-        FMResultSet *rs = [db executeQuery:@"SELECT * FROM files WHERE user_id = ? AND is_root_folder = 1 ORDER BY file_name ASC", [NSNumber numberWithInteger:currentUser.idUser]];
+        FMResultSet *rs = [db executeQuery:@"SELECT * FROM files WHERE user_id = ? AND is_root_folder = 1 ORDER BY file_name ASC", [NSNumber numberWithInteger:currentUser.userId]];
         
         while ([rs next]) {
             
@@ -1238,6 +1231,7 @@
             output.permissions = [rs stringForColumn:@"permissions"];
             output.taskIdentifier = [rs intForColumn:@"task_identifier"];
             output.providingFileId = [rs intForColumn:@"providing_file_id"];
+            output.ocPrivatelink = [rs stringForColumn:@"oc_privatelink"];
             
         }
         [rs close];
@@ -1263,7 +1257,6 @@
 }
 
 
-
 +(void) updateEtagOfFileDtoByFileName:(NSString *) fileName andFilePath: (NSString *) filePath andActiveUser: (UserDto *) aciveUser withNewEtag: (NSString *)etag {
     
     FMDatabaseQueue *queue = Managers.sharedDatabase;
@@ -1271,13 +1264,14 @@
     [queue inTransaction:^(FMDatabase *db, BOOL *rollback) {
         BOOL correctQuery=NO;
         
-        correctQuery = [db executeUpdate:@"UPDATE files SET etag=? WHERE file_path = ? AND file_name=? AND user_id = ?", etag, filePath, fileName, [NSNumber numberWithInteger:aciveUser.idUser]];
+        correctQuery = [db executeUpdate:@"UPDATE files SET etag=? WHERE file_path = ? AND file_name=? AND user_id = ?", etag, filePath, fileName, [NSNumber numberWithInteger:aciveUser.userId]];
         
         if (!correctQuery) {
             DLog(@"Error in updatePathwithNewPath");
         }
     }];
 }
+
 
 + (void) updateFilesWithFileId:(NSInteger) oldFileId withNewFileId:(NSInteger) fileId {
     
@@ -1295,7 +1289,7 @@
     [queue inTransaction:^(FMDatabase *db, BOOL *rollback) {
         BOOL correctQuery=NO;
         
-        correctQuery = [db executeUpdate:@"UPDATE files SET file_id=? WHERE file_id = ? AND user_id = ?", [NSNumber numberWithInteger:fileId], [NSNumber numberWithInteger:oldFileId], [NSNumber numberWithInteger:mUser.idUser]];
+        correctQuery = [db executeUpdate:@"UPDATE files SET file_id=? WHERE file_id = ? AND user_id = ?", [NSNumber numberWithInteger:fileId], [NSNumber numberWithInteger:oldFileId], [NSNumber numberWithInteger:mUser.userId]];
         
         if (!correctQuery) {
             DLog(@"Error in updatePathwithNewPath");
@@ -1303,6 +1297,7 @@
         
     }];
 }
+
 
 + (void) setFile:(NSInteger)idFile isNecessaryUpdate:(BOOL)isNecessaryUpdate {
     FMDatabaseQueue *queue = Managers.sharedDatabase;
@@ -1320,15 +1315,15 @@
 }
 
 
-+ (BOOL) isGetFilesByDownloadState:(enumDownload)downloadState andByUser:(UserDto *) currentUser andFolder:(NSString *) folder {
++ (BOOL) isGetFilesByDownloadState:(enumDownload)downloadState andByUser:(UserDto *)currentUser andFolder:(NSString *)folder {
     
     __block BOOL output = NO;
-    DLog(@"getFilesByFileId:(int) fileId");
+    DLog(@"isGetFilesByDownloadState: %d andByUser: %@",downloadState, currentUser);
     
     FMDatabaseQueue *queue = Managers.sharedDatabase;
     
     [queue inDatabase:^(FMDatabase *db) {
-     FMResultSet *rs = [db executeQuery:@"SELECT COUNT(*) as NUM FROM files WHERE is_download = ? AND user_id = ? AND file_path LIKE ? ORDER BY file_name ASC", [NSNumber numberWithInteger:downloadState], [NSNumber numberWithInteger:currentUser.idUser], [NSString stringWithFormat:@"%@%%", folder]];
+     FMResultSet *rs = [db executeQuery:@"SELECT COUNT(*) as NUM FROM files WHERE is_download = ? AND user_id = ? AND file_path LIKE ? ORDER BY file_name ASC", [NSNumber numberWithInteger:downloadState], [NSNumber numberWithInteger:currentUser.userId], [NSString stringWithFormat:@"%@%%", folder]];
         while ([rs next]) {
             int numberOfFiles = [rs intForColumn:@"NUM"];
             if(numberOfFiles > 0) {
@@ -1341,24 +1336,11 @@
     return output;
 }
 
-///-----------------------------------
-/// @name File is in the Path?
-///-----------------------------------
 
-/**
- * Method that indicate if a specific file is into a specific path
- *
- * @param idFile -> NSInteger of id file
- * @param idUser -> NSInteger of id user
- * @param folder -> Folder path
- *
- * @return YES/NO
- *
- */
-+ (BOOL) isThisFile:(NSInteger)idFile ofThisUserId:(NSInteger)idUser intoThisFolder:(NSString *)folder{
++ (BOOL) isThisFile:(NSInteger)idFile ofThisUserId:(NSInteger)userId intoThisFolder:(NSString *)folder{
     
     DLog(@"ManageFiles -> idFile: %ld", (long)idFile);
-    DLog(@"ManageFiles -> idUser: %ld", (long)idUser);
+    DLog(@"ManageFiles -> userId: %ld", (long)userId);
 
     DLog(@"ManageFiles -> folder: %@", folder);
     
@@ -1367,7 +1349,7 @@
     FMDatabaseQueue *queue = Managers.sharedDatabase;
     
     [queue inDatabase:^(FMDatabase *db) {
-        FMResultSet *rs = [db executeQuery:@"SELECT id FROM files WHERE user_id = ? AND file_path LIKE ?", [NSNumber numberWithInteger:idUser], [NSString stringWithFormat:@"%@%%", folder]];
+        FMResultSet *rs = [db executeQuery:@"SELECT id FROM files WHERE user_id = ? AND file_path LIKE ?", [NSNumber numberWithInteger:userId], [NSString stringWithFormat:@"%@%%", folder]];
        
         
         while ([rs next]) {
@@ -1383,9 +1365,8 @@
     }];
     
     return output;
-    
-    
 }
+
 
 + (void) updateFilesByUser:(UserDto *) currentUser andFolder:(NSString *) folder toDownloadState:(enumDownload)downloadState andIsNecessaryUpdate:(BOOL) isNecessaryUpdate {
     
@@ -1394,7 +1375,7 @@
     [queue inTransaction:^(FMDatabase *db, BOOL *rollback) {
         BOOL correctQuery=NO;
         
-        correctQuery = [db executeUpdate:@"UPDATE files SET is_download = ?, is_necessary_update = ? WHERE user_id = ? AND file_path LIKE ? ", [NSNumber numberWithInteger:downloadState],[NSNumber numberWithInt:isNecessaryUpdate], [NSNumber numberWithInteger:currentUser.idUser], [NSString stringWithFormat:@"%@%%", folder]];
+        correctQuery = [db executeUpdate:@"UPDATE files SET is_download = ?, is_necessary_update = ? WHERE user_id = ? AND file_path LIKE ? ", [NSNumber numberWithInteger:downloadState],[NSNumber numberWithInt:isNecessaryUpdate], [NSNumber numberWithInteger:currentUser.userId], [NSString stringWithFormat:@"%@%%", folder]];
         
         if (!correctQuery) {
             DLog(@"Error in updateFilesByUserAndFolder");
@@ -1403,30 +1384,17 @@
     }];
 }
 
+
 #pragma mark - Share Querys.
 
-
-///-----------------------------------
-/// @name Update Share File Source
-///-----------------------------------
-
-/**
- * Method that update share file source
- *
- *
- * @param value -> NSInteger
- * @param idFile -> NSInteger
- * @param idUser -> NSInteger
- *
- */
-+ (void) updateShareFileSource:(NSInteger)value forThisFile:(NSInteger)idFile ofThisUserId:(NSInteger)idUser{
++ (void) updateShareFileSource:(NSInteger)value forThisFile:(NSInteger)idFile ofThisUserId:(NSInteger)userId{
     
     FMDatabaseQueue *queue = Managers.sharedDatabase;
     
     [queue inTransaction:^(FMDatabase *db, BOOL *rollback) {
         BOOL correctQuery=NO;
         
-        correctQuery = [db executeUpdate:@"UPDATE files SET shared_file_source = ? WHERE id = ? AND user_id= ?", [NSNumber numberWithInteger:value], [NSNumber numberWithInteger:idFile],[NSNumber numberWithInteger:idUser]];
+        correctQuery = [db executeUpdate:@"UPDATE files SET shared_file_source = ? WHERE id = ? AND user_id= ?", [NSNumber numberWithInteger:value], [NSNumber numberWithInteger:idFile],[NSNumber numberWithInteger:userId]];
         
         if (!correctQuery) {
             DLog(@"Error in update share file source");
@@ -1435,23 +1403,14 @@
     }];
 }
 
-///-----------------------------------
-/// @name setUnShareAllFilesByIdUser
-///-----------------------------------
 
-/**
- * Method to unshare all the files of one user
- *
- * @param idUser -> NSInteger
- *
- */
-+ (void) setUnShareAllFilesByIdUser:(NSInteger)idUser {
++ (void) setUnShareAllFilesByUserId:(NSInteger)userId {
     FMDatabaseQueue *queue = Managers.sharedDatabase;
     
     [queue inTransaction:^(FMDatabase *db, BOOL *rollback) {
         BOOL correctQuery=NO;
         
-        correctQuery = [db executeUpdate:@"UPDATE files SET shared_file_source = 0 WHERE user_id= ?", [NSNumber numberWithInteger:idUser]];
+        correctQuery = [db executeUpdate:@"UPDATE files SET shared_file_source = 0 WHERE user_id= ?", [NSNumber numberWithInteger:userId]];
         
         if (!correctQuery) {
             DLog(@"Error in update share file source");
@@ -1460,16 +1419,7 @@
     }];
 }
 
-///-----------------------------------
-/// @name updateFilesAndSetSharedOfUser
-///-----------------------------------
 
-/**
- * This method update the Files table and set the relation with the shared
- *
- * @param userId -> NSInteger
- *
- */
 + (void) updateFilesAndSetSharedOfUser:(NSInteger)userId {
     
     NSMutableArray *listOfFileSource = [NSMutableArray new];
@@ -1507,19 +1457,9 @@
         }
         
     }];
-
 }
 
-///-----------------------------------
-/// @name Delete Shared Data of a list of files
-///-----------------------------------
 
-/**
- * This method update to 0 {not shared by link} the status of a list of files
- *
- * @param pathItems -> NSArray
- * @param userId -> NSInteger
- */
 + (void) deleteShareDataOfThisFiles:(NSArray*)pathItems ofUser:(NSInteger)userId{
     
     for (FileDto *file in pathItems) {
@@ -1530,18 +1470,6 @@
 }
 
 
-
-///-----------------------------------
-/// @name Get files by download status
-///-----------------------------------
-
-/**
- * This method get all the file where the download status is equal to status
- *
- * @param int -> The download status
- *
- * @return NSMutableArray -> The array with the files
- */
 + (NSMutableArray *) getFilesByDownloadStatus:(NSInteger) status andUser:(UserDto *) user {
     __block NSMutableArray *output = [NSMutableArray new];
     DLog(@"getFilesByDownloadStatus: %ld",(long)status);
@@ -1550,7 +1478,7 @@
     
     [queue inDatabase:^(FMDatabase *db) {
         
-    FMResultSet *rs = [db executeQuery:@"SELECT * FROM files WHERE is_download = ? AND user_id = ? ORDER BY file_name ASC", [NSNumber numberWithInteger:status], [NSNumber numberWithInteger:user.idUser]];
+    FMResultSet *rs = [db executeQuery:@"SELECT * FROM files WHERE is_download = ? AND user_id = ? ORDER BY file_name ASC", [NSNumber numberWithInteger:status], [NSNumber numberWithInteger:user.userId]];
         while ([rs next]) {
             
             FileDto *currentFile = [[FileDto alloc] init];
@@ -1573,6 +1501,7 @@
             currentFile.permissions = [rs stringForColumn:@"permissions"];
             currentFile.taskIdentifier = [rs intForColumn:@"task_identifier"];
             currentFile.providingFileId = [rs intForColumn:@"providing_file_id"];
+            currentFile.ocPrivatelink = [rs stringForColumn:@"oc_privatelink"];
             
             [output addObject:currentFile];
         }
@@ -1583,17 +1512,6 @@
 }
 
 
-
-///-----------------------------------
-/// @name setUnShareFilesByListOfOCShared
-///-----------------------------------
-
-/**
- * Method to unshare by link the files that are not unshare anymore
- *
- * @param listOfRemoved -> NSArray
- *
- */
 + (void) setUnShareFilesByUser:(UserDto *) user {
     
     FMDatabaseQueue *queue = Managers.sharedDatabase;
@@ -1601,7 +1519,7 @@
     [queue inTransaction:^(FMDatabase *db, BOOL *rollback) {
         BOOL correctQuery=NO;
         
-        correctQuery = [db executeUpdate:@"UPDATE files SET shared_file_source = 0 WHERE user_id = ?", [NSNumber numberWithInteger:user.idUser]];
+        correctQuery = [db executeUpdate:@"UPDATE files SET shared_file_source = 0 WHERE user_id = ?", [NSNumber numberWithInteger:user.userId]];
         
         if (!correctQuery) {
             DLog(@"Error in update share file source");
@@ -1631,22 +1549,9 @@
             }
         }];
     }*/
-     
 }
 
-///-----------------------------------
-/// @name Get the filedto equal with the share dto pah
-///-----------------------------------
 
-/**
- * This method return a FileDto with equal share dto path, if 
- * is not catched this method return nil
- *
- * @param path -> NSString
- *
- * @return FileDto
- *
- */
 + (FileDto *) getFileEqualWithShareDtoPath:(NSString*)path andByUser:(UserDto *) user {
     
     UserDto *mUser;
@@ -1665,7 +1570,7 @@
     __block NSString *comparePath = nil;
     
     [queue inDatabase:^(FMDatabase *db) {
-        FMResultSet *rs = [db executeQuery:@"SELECT * FROM files WHERE user_id = ?", [NSNumber numberWithInteger:user.idUser]];
+        FMResultSet *rs = [db executeQuery:@"SELECT * FROM files WHERE user_id = ?", [NSNumber numberWithInteger:user.userId]];
         while ([rs next]) {
             
             comparePath = [NSString stringWithFormat:@"/%@%@", [rs stringForColumn:@"file_path"], [rs stringForColumn:@"file_name"]];
@@ -1696,6 +1601,7 @@
                 output.permissions = [rs stringForColumn:@"permissions"];
                 output.taskIdentifier = [rs intForColumn:@"task_identifier"];
                 output.providingFileId = [rs intForColumn:@"providing_file_id"];
+                output.ocPrivatelink = [rs stringForColumn:@"oc_privatelink"];
                 
             }
         }
@@ -1705,17 +1611,7 @@
     return output;
 }
 
-///-----------------------------------
-/// @name is Catched in data base this path
-///-----------------------------------
 
-/**
- * This method check if a path is inside the DB
- *
- * @param path -> NSString {/folder1/folder1_1}
- *
- * @return YES/NO
- */
 + (BOOL) isCatchedInDataBaseThisPath: (NSString*)path{
     
     //Ex: /folder1/folder1_1/folder1_1_1/folder1_1_1_1
@@ -1737,7 +1633,7 @@
     
     [queue inDatabase:^(FMDatabase *db) {
 
-    FMResultSet *rs = [db executeQuery:@"SELECT * FROM files WHERE user_id = ? AND is_directory = 1", [NSNumber numberWithInteger:mUser.idUser]];
+    FMResultSet *rs = [db executeQuery:@"SELECT * FROM files WHERE user_id = ? AND is_directory = 1", [NSNumber numberWithInteger:mUser.userId]];
 
         while ([rs next]) {
             
@@ -1755,19 +1651,9 @@
     }];
 
     return isExist;
-    
 }
 
-///-----------------------------------
-/// @name setUnShareFilesOfFolder
-///-----------------------------------
 
-/**
- * Method to unshare all the shared of a folder
- *
- * @param folder -> FileDto
- *
- */
 + (void) setUnShareFilesOfFolder:(FileDto *) folder {
     FMDatabaseQueue *queue = Managers.sharedDatabase;
     
@@ -1784,16 +1670,6 @@
 
 #pragma mark - Favorites method
 
-///-----------------------------------
-/// @name updateTheFileID:asFavorite:
-///-----------------------------------
-
-/**
- * This method updates the favorite field of the file
- *
- * @param idFile -> int
- * @param isFavorite -> BOOL
- */
 + (void) updateTheFileID: (NSInteger)idFile asFavorite: (BOOL) isFavorite {
     DLog(@"updateTheFavoriteFile");
     FMDatabaseQueue *queue = Managers.sharedDatabase;
@@ -1809,24 +1685,14 @@
     }];
 }
 
-///-----------------------------------
-/// @name getAllFavoritesFilesOfUserId:userId
-///-----------------------------------
 
-/**
- * This method returned all favorites files of a specific user
- *
- * @param userId -> NSInterger
- *
- * @return NSArray -> Array of favorites items
- */
 + (NSArray*) getAllFavoritesFilesOfUserId:(NSInteger)userId {
     
     FMDatabaseQueue *queue = Managers.sharedDatabase;
     
     NSMutableArray *tempArray = [NSMutableArray new];
     //Get the user
-    UserDto *mUser = [ManageUsersDB getUserByIdUser:userId];
+    UserDto *mUser = [ManageUsersDB getUserByUserId:userId];
     
     [queue inDatabase:^(FMDatabase *db) {
         FMResultSet *rs = [db executeQuery:@"SELECT * FROM files WHERE is_favorite = 1 AND user_id = ? AND is_directory = 0", [NSNumber numberWithInteger:userId]];
@@ -1852,6 +1718,7 @@
             currentFile.permissions = [rs stringForColumn:@"permissions"];
             currentFile.taskIdentifier = [rs intForColumn:@"task_identifier"];
             currentFile.providingFileId = [rs intForColumn:@"providing_file_id"];
+            currentFile.ocPrivatelink = [rs stringForColumn:@"oc_privatelink"];
             
             [tempArray addObject:currentFile];
 
@@ -1863,20 +1730,9 @@
     tempArray = nil;
     
     return output;
-
 }
 
-///-----------------------------------
-/// @name getAllFavoritesByFolder:userId
-///-----------------------------------
 
-/**
- * This method returned all favorites files of a specific user
- *
- * @param folder -> FolderDto
- *
- * @return NSArray -> Array of favorites items
- */
 + (NSArray*) getAllFavoritesByFolder:(FileDto *) folder {
     
     FMDatabaseQueue *queue = Managers.sharedDatabase;
@@ -1909,6 +1765,7 @@
             currentFile.permissions = [rs stringForColumn:@"permissions"];
             currentFile.taskIdentifier = [rs intForColumn:@"task_identifier"];
             currentFile.providingFileId = [rs intForColumn:@"providing_file_id"];
+            currentFile.ocPrivatelink = [rs stringForColumn:@"oc_privatelink"];
             
             [tempArray addObject:currentFile];
             
@@ -1920,19 +1777,9 @@
     tempArray = nil;
     
     return output;
-    
 }
 
-///-----------------------------------
-/// @name setNoFavoritesAllFilesOfAFolder
-///-----------------------------------
 
-/**
- * This method set all files and folders of a folder as no favorite
- *
- * @param folder -> FolderDto
- *
- */
 + (void) setNoFavoritesAllFilesOfAFolder:(FileDto *) folder {
     FMDatabaseQueue *queue = Managers.sharedDatabase;
     
@@ -1968,7 +1815,7 @@
     NSMutableArray *tempArray = [NSMutableArray new];
     
     //Get the user
-    UserDto *mUser = [ManageUsersDB getUserByIdUser:userId];
+    UserDto *mUser = [ManageUsersDB getUserByUserId:userId];
     
     __block NSString *comparePath = nil;
     
@@ -2003,6 +1850,7 @@
                 currentFile.permissions = [rs stringForColumn:@"permissions"];
                 currentFile.taskIdentifier = [rs intForColumn:@"task_identifier"];
                 currentFile.providingFileId = [rs intForColumn:@"providing_file_id"];
+                currentFile.ocPrivatelink = [rs stringForColumn:@"oc_privatelink"];
                 
                 [tempArray addObject:currentFile];
                 
@@ -2015,17 +1863,9 @@
     tempArray = nil;
     
     return output;
-
 }
 
 
-///-----------------------------------
-/// @name deleteAlleTagOfTheDirectoties
-///-----------------------------------
-
-/**
- * This method is necessary for updateDBVersion7To8. With it the etag are deleted in order to force the refresh of the file list
- */
 +(void) deleteAlleTagOfTheDirectoties {
     
     FMDatabaseQueue *queue = Managers.sharedDatabase;
@@ -2042,10 +1882,6 @@
 }
 
 #pragma mark - TaskIdentifier methods
-
-///-----------------------------------
-/// @name update file with task identifier
-///-----------------------------------
 
 + (void) updateFile:(NSInteger)idFile withTaskIdentifier:(NSInteger)taskIdentifier {
 
@@ -2077,19 +1913,16 @@
             DLog(@"Error in update providing file");
         }
     }];
-
-    
 }
 
 + (FileDto *) getFileDtoRelatedWithProvidingFileId:(NSInteger)providingFileId ofUser:(NSInteger)userId{
-    
     
     FMDatabaseQueue *queue = Managers.sharedDatabase;
     
     __block FileDto *fileTemp = nil;
     
     //Get the user
-    UserDto *user = [ManageUsersDB getUserByIdUser:userId];
+    UserDto *user = [ManageUsersDB getUserByUserId:userId];
     
     [queue inDatabase:^(FMDatabase *db) {
         FMResultSet *rs = [db executeQuery:@"SELECT * FROM files WHERE providing_file_id = ?", [NSNumber numberWithInteger:providingFileId]];
@@ -2116,15 +1949,14 @@
             fileTemp.permissions = [rs stringForColumn:@"permissions"];
             fileTemp.taskIdentifier = [rs intForColumn:@"task_identifier"];
             fileTemp.providingFileId = [rs intForColumn:@"providing_file_id"];
+            fileTemp.ocPrivatelink = [rs stringForColumn:@"oc_privatelink"];
         
         }
         
         [rs close];
     }];
     
-
     return fileTemp;
-    
 }
 
 @end

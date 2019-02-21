@@ -22,6 +22,7 @@
 #import "DetailViewController.h"
 #import "TTOpenInAppActivity.h"
 #import "PresentedViewUtils.h"
+#import "Customization.h"
 
 
 
@@ -88,28 +89,25 @@
     //Check if the localFolder is null. 
     if (file.localFolder) {
         
-         DLog(@"File path is %@", file.localFolder);
+        DLog(@"File path is %@", file.localFolder);
         
         //Pass path to url
         NSURL *url = [NSURL fileURLWithPath:file.localFolder];
         self.documentInteractionController = [UIDocumentInteractionController interactionControllerWithURL:url];
         [self.documentInteractionController setDelegate:self];
-        UIViewController *presentedView = [PresentedViewUtils getPresentedViewControllerInWindow:[[[UIApplication sharedApplication] windows] lastObject]];
         
         if (_isTheParentViewACell) {
             
-            [self.documentInteractionController presentOpenInMenuFromRect:self.cellFrame inView:self.parentView animated:YES];
-
+            [self.documentInteractionController presentOptionsMenuFromRect:self.cellFrame inView:self.parentView animated:YES];
+            
         } else {
             
             if (IS_IPHONE) {
-                [self.documentInteractionController presentOpenInMenuFromRect:CGRectZero inView:presentedView.view animated:YES];
-
+                [self.documentInteractionController presentOptionsMenuFromRect:CGRectZero inView:self.parentView animated:YES];
+                
             } else {
-                [self.documentInteractionController presentOpenInMenuFromBarButtonItem:self.parentButton animated:YES];
-
+                [self.documentInteractionController presentOptionsMenuFromBarButtonItem:self.parentButton animated:YES];
             }
-
         }
     }
 }
