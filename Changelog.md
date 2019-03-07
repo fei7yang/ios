@@ -1,3 +1,10 @@
+<<<<<<< HEAD
+=======
+## 3.8.1 (Feb 2019)
+- Fix share translations
+- Fix Document Provider
+
+>>>>>>> upstream/master
 ## 3.8.0 (Aug 2018)
 - New look for public link view
 - Add control of reshares for the content owner
